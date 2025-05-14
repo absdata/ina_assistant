@@ -105,37 +105,45 @@ class TelegramBot:
                 text = text[len(trigger):].strip()
                 break
         
+        # Log the initial message with clear formatting
         self.logger.debug(
             "=== Starting Message Processing ===",
             extra={
                 "message_details": {
                     "original_message": original_text,
                     "cleaned_message": text,
-                    "user_id": user.id,
-                    "chat_id": message.chat_id,
-                    "username": user.username
+                    "user_info": {
+                        "user_id": user.id,
+                        "chat_id": message.chat_id,
+                        "username": user.username
+                    }
                 }
             }
+        )
+        
+        # Log the actual message content separately for visibility
+        self.logger.info(
+            f"Processing message: '{text}'",
         )
             
         try:
             # Process the message
             message_id, chunks = await self._process_message(message)
             
+            # Log chunks with clear message reference
             self.logger.debug(
                 "=== Retrieved File Chunks ===",
                 extra={
                     "chunks_details": {
+                        "message": text,
                         "total_chunks": len(chunks),
                         "chunks_preview": [
                             {
                                 "index": idx,
                                 "content": str(chunk)[:500],
-                                "metadata": getattr(chunk, "metadata", {}),
                                 "type": type(chunk).__name__
                             } for idx, chunk in enumerate(chunks[:2])
-                        ] if chunks else [],
-                        "message": text  # Include the message here too
+                        ] if chunks else []
                     }
                 }
             )
