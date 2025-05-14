@@ -13,7 +13,7 @@ def create_memory_systems():
     """Create memory systems using Azure OpenAI embedding config."""
 
     embedder_config = {
-        "provider": "openai",
+        "provider": "azure",
         "config": {
             "model": os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
         }
