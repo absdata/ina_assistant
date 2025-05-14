@@ -20,6 +20,7 @@ import json
 import logging
 from typing import Any, Dict
 from datetime import datetime
+from utils.memory_config import create_memory_systems
 
 class TelegramBot:
     def __init__(self):
@@ -360,7 +361,7 @@ class TelegramBot:
                 process=Process.sequential,
                 verbose=True,
                 memory=True,
-                embedder={"provider": "azure"}
+                embedder=create_memory_systems()
             )
 
             self.logger.debug(
