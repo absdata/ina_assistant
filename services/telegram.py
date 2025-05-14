@@ -66,6 +66,13 @@ class TelegramBot:
         if not text.lower().startswith(("inna", "ina")):
             return
             
+        # Remove trigger words (Inna/Ina) from the beginning of the message
+        cleaned_text = text.lower()
+        for trigger in ["inna", "ina"]:
+            if cleaned_text.startswith(trigger):
+                text = text[len(trigger):].strip()
+                break
+            
         try:
             self.logger.info(
                 "Processing new message",
@@ -74,7 +81,8 @@ class TelegramBot:
                     "user_id": user.id,
                     "chat_id": message.chat_id,
                     "message_length": len(text),
-                    "message_type": "text"
+                    "message_type": "text",
+                    "original_message": text
                 }
             )
             
@@ -86,7 +94,8 @@ class TelegramBot:
                 extra={
                     "context": "message_processing",
                     "message_id": message_id,
-                    "chunks_count": len(chunks)
+                    "chunks_count": len(chunks),
+                    "chunks_content": chunks[:3]  # Log first 3 chunks for debugging
                 }
             )
             
@@ -99,7 +108,9 @@ class TelegramBot:
                     "context": "context_retrieval",
                     "user_context_size": len(conversation_context["user_context"]),
                     "chat_context_size": len(conversation_context["chat_context"]),
-                    "file_context_size": len(conversation_context["file_context"])
+                    "file_context_size": len(conversation_context["file_context"]),
+                    "user_context_sample": conversation_context["user_context"][:2],  # Log first 2 context items
+                    "chat_context_sample": conversation_context["chat_context"][:2]
                 }
             )
             
@@ -139,7 +150,8 @@ class TelegramBot:
                 extra={
                     "context": "crew_execution",
                     "agents": ["planner", "doer", "critic", "responder"],
-                    "user_id": user.id
+                    "user_id": user.id,
+                    "task_description": text
                 }
             )
             
@@ -147,12 +159,29 @@ class TelegramBot:
             response = crew.kickoff()
             response_text = str(response.tasks_output[0])  # Get first task output from CrewOutput
             
+            # Log detailed agent outputs
+            for i, task in enumerate(response.tasks):
+                self.logger.debug(
+                    f"Agent task completion",
+                    extra={
+                        "context": "agent_execution",
+                        "task_index": i,
+                        "agent_name": task.agent.name,
+                        "task_output": task.output[:500],  # Log first 500 chars of output
+                        "task_duration": task.duration
+                    }
+                )
+            
             self.logger.info(
                 "Crew execution completed",
                 extra={
                     "context": "crew_execution",
                     "response_length": len(response_text),
-                    "user_id": user.id
+                    "user_id": user.id,
+                    "execution_summary": {
+                        "total_tasks": len(response.tasks),
+                        "total_duration": sum(task.duration for task in response.tasks)
+                    }
                 }
             )
             
@@ -165,6 +194,7 @@ class TelegramBot:
                 extra={
                     "context": "message_handling",
                     "error": str(e),
+                    "error_type": type(e).__name__,
                     "user_id": user.id,
                     "chat_id": message.chat_id
                 },
