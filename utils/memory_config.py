@@ -9,25 +9,27 @@ from config.settings import (
 )
 
 def create_memory_systems():
-    """Create memory systems with Azure OpenAI embeddings."""
-    # Create Azure embedding function
-    embedding_function = AzureOpenAIEmbeddingFunction(
-        api_key=AZURE_OPENAI_API_KEY,
-        endpoint=AZURE_OPENAI_ENDPOINT,
-        deployment=AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
-        api_version=AZURE_OPENAI_API_VERSION
+    """Create memory systems using Azure OpenAI embedding config."""
+
+    embedder_config = {
+        "provider": "openai",
+        "config": {
+            "model": os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large")
+        }
+    }
+
+    rag_storage = RAGStorage(
+        embedder_config=embedder_config,
+        type="short_term",
+        path="/var/getinn/ina_assistant/memory/"
     )
-    
-    # Create RAG storage with custom embedding function
-    rag_storage = RAGStorage(embedder=embedding_function)
-    
-    # Create memory systems with RAG storage
+
     short_term = ShortTermMemory(storage=rag_storage)
     long_term = LongTermMemory(storage=rag_storage)
     entity = EntityMemory(storage=rag_storage)
-    
+
     return {
         'short_term': short_term,
         'long_term': long_term,
         'entity': entity
-    } 
+    }
