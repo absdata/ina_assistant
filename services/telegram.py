@@ -17,6 +17,7 @@ from config.logging_config import get_logger
 from utils.llm_config import create_llm_config
 import asyncio
 import json
+import logging
 from typing import Any, Dict
 
 class TelegramBot:
@@ -32,6 +33,9 @@ class TelegramBot:
         self.responder = Responder(llm=llm_config)
         
         self.logger = get_logger("services.telegram", "bot_service")
+        # Set logger to DEBUG level
+        self.logger.setLevel(logging.DEBUG)
+        
         self.logger.info("Initializing Telegram bot service", extra={
             "agents": ["planner", "doer", "critic", "responder"],
             "services": ["file_handler"]
@@ -59,25 +63,25 @@ class TelegramBot:
 
     def _log_agent_start(self, agent_name: str, task: Dict[str, Any]) -> None:
         """Log when an agent starts working on a task."""
-        self.logger.info(
+        self.logger.debug(
             f"Agent {agent_name} starting work",
             extra={
                 "context": "agent_execution",
                 "agent": agent_name,
                 "task_description": task.get("description", ""),
-                "expected_output": task.get("expected_output", ""),
+                "task_context": task.get("context", []),
                 "stage": "start"
             }
         )
 
     def _log_agent_end(self, agent_name: str, output: str, task: Dict[str, Any]) -> None:
         """Log when an agent completes a task."""
-        self.logger.info(
+        self.logger.debug(
             f"Agent {agent_name} completed task",
             extra={
                 "context": "agent_execution",
                 "agent": agent_name,
-                "output_preview": output[:200] if output else "",
+                "output": str(output),
                 "task_description": task.get("description", ""),
                 "stage": "complete"
             }
@@ -99,34 +103,30 @@ class TelegramBot:
             if cleaned_text.startswith(trigger):
                 text = text[len(trigger):].strip()
                 break
+        
+        self.logger.debug(
+            "Processing message",
+            extra={
+                "original_text": text,
+                "user_id": user.id,
+                "chat_id": message.chat_id
+            }
+        )
             
         try:
-            self.logger.info(
-                "Processing new message",
-                extra={
-                    "context": "message_handling",
-                    "user_id": user.id,
-                    "chat_id": message.chat_id,
-                    "message_length": len(text),
-                    "message_type": "text",
-                    "original_message": text
-                }
-            )
-            
             # Process the message
             message_id, chunks = await self._process_message(message)
             
-            # Debug log for chunks
             self.logger.debug(
-                "File chunks retrieved",
+                "File chunks details",
                 extra={
-                    "context": "file_processing",
                     "chunks_count": len(chunks),
-                    "chunks_sample": [
+                    "chunks_preview": [
                         {
-                            "content": str(chunk)[:200],
-                            "metadata": getattr(chunk, "metadata", {})
-                        } for chunk in chunks[:3]
+                            "content": str(chunk)[:500],
+                            "metadata": getattr(chunk, "metadata", {}),
+                            "type": type(chunk).__name__
+                        } for chunk in chunks[:2]
                     ] if chunks else []
                 }
             )
@@ -134,124 +134,139 @@ class TelegramBot:
             # Get comprehensive context
             conversation_context = await self._get_conversation_context(message)
             
-            # Debug log for context
             self.logger.debug(
-                "Context details",
+                "Full context details",
                 extra={
-                    "context": "context_details",
-                    "file_context_count": len(conversation_context["file_context"]),
-                    "file_context_sample": conversation_context["file_context"][:2],
-                    "chat_context_count": len(conversation_context["chat_context"]),
-                    "user_context_count": len(conversation_context["user_context"])
+                    "file_context": conversation_context["file_context"][:2],
+                    "chat_context": conversation_context["chat_context"][:2],
+                    "user_context": conversation_context["user_context"][:2],
+                    "context_counts": {
+                        "file": len(conversation_context["file_context"]),
+                        "chat": len(conversation_context["chat_context"]),
+                        "user": len(conversation_context["user_context"])
+                    }
                 }
             )
 
-            # Prepare shared context for all agents
+            # Prepare shared context
             shared_context = {
-                "chunks": chunks,
+                "chunks": [str(chunk) for chunk in chunks],  # Convert chunks to strings
                 "user_context": conversation_context["user_context"],
                 "chat_context": conversation_context["chat_context"],
                 "file_context": conversation_context["file_context"],
                 "original_query": text
             }
             
-            # Create and run the crew with enhanced context and callbacks
+            self.logger.debug(
+                "Prepared shared context",
+                extra={
+                    "context_structure": {
+                        "chunks_count": len(shared_context["chunks"]),
+                        "user_context_count": len(shared_context["user_context"]),
+                        "chat_context_count": len(shared_context["chat_context"]),
+                        "file_context_count": len(shared_context["file_context"]),
+                        "query": shared_context["original_query"]
+                    }
+                }
+            )
+
+            # Create tasks with explicit instructions about file content
+            tasks = [
+                {
+                    "description": "Analyze user request and create a detailed plan",
+                    "expected_output": "A structured plan for handling the user's request",
+                    "agent": self.planner,
+                    "context": [
+                        {
+                            "description": "User's request to analyze",
+                            "expected_output": "Understanding of the request",
+                            "role": "user",
+                            "content": f"Original query: {text}\n\nYou have access to {len(chunks)} file chunks and {len(conversation_context['file_context'])} file context entries. Use this information to create a plan."
+                        },
+                        {
+                            "description": "Available context and information",
+                            "expected_output": "Context for planning",
+                            "role": "system",
+                            "content": json.dumps(shared_context)
+                        }
+                    ]
+                },
+                {
+                    "description": "Execute the plan and process the request",
+                    "expected_output": "Results from executing the plan",
+                    "agent": self.doer,
+                    "context": [
+                        {
+                            "description": "User's request to process",
+                            "expected_output": "Understanding of the task",
+                            "role": "user",
+                            "content": f"Original query: {text}\n\nAnalyze and use the provided {len(chunks)} file chunks and context to answer the query. Each chunk contains relevant information that should be incorporated into the response."
+                        },
+                        {
+                            "description": "Available context and information",
+                            "expected_output": "Context for execution",
+                            "role": "system",
+                            "content": json.dumps(shared_context)
+                        }
+                    ]
+                },
+                {
+                    "description": "Review and critique the execution results",
+                    "expected_output": "Analysis and improvements of the results",
+                    "agent": self.critic,
+                    "context": [
+                        {
+                            "description": "User's original request",
+                            "expected_output": "Understanding of requirements",
+                            "role": "user",
+                            "content": f"Original query: {text}\n\nVerify that the response incorporates information from all {len(chunks)} available file chunks and context appropriately."
+                        },
+                        {
+                            "description": "Available context and information",
+                            "expected_output": "Context for critique",
+                            "role": "system",
+                            "content": json.dumps(shared_context)
+                        }
+                    ]
+                },
+                {
+                    "description": "Generate final response based on all previous work",
+                    "expected_output": "A comprehensive and helpful response to the user's message",
+                    "agent": self.responder,
+                    "context": [
+                        {
+                            "description": "User's request to respond to",
+                            "expected_output": "Understanding of user needs",
+                            "role": "user",
+                            "content": f"Original query: {text}\n\nGenerate a comprehensive response using information from the {len(chunks)} available file chunks and previous agent outputs. Ensure all relevant information is included."
+                        },
+                        {
+                            "description": "Available context and information",
+                            "expected_output": "Context for response generation",
+                            "role": "system",
+                            "content": json.dumps(shared_context)
+                        }
+                    ]
+                }
+            ]
+
             crew = Crew(
                 agents=[self.planner, self.doer, self.critic, self.responder],
-                tasks=[
-                    {
-                        "description": "Analyze user request and create a detailed plan",
-                        "expected_output": "A structured plan for handling the user's request",
-                        "agent": self.planner,
-                        "context": [
-                            {
-                                "description": "User's request to analyze",
-                                "expected_output": "Understanding of the request",
-                                "role": "user",
-                                "content": f"Query: {text}\nAvailable file chunks: {len(chunks)}\nFile context entries: {len(conversation_context['file_context'])}"
-                            },
-                            {
-                                "description": "System context and available information",
-                                "expected_output": "Context for planning",
-                                "role": "system",
-                                "content": json.dumps(shared_context)
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Execute the plan and process the request",
-                        "expected_output": "Results from executing the plan",
-                        "agent": self.doer,
-                        "context": [
-                            {
-                                "description": "User's request to process",
-                                "expected_output": "Understanding of the task",
-                                "role": "user",
-                                "content": f"Query: {text}\nAnalyze and use the provided file chunks ({len(chunks)} available) and context to answer the query."
-                            },
-                            {
-                                "description": "System context and available information",
-                                "expected_output": "Context for execution",
-                                "role": "system",
-                                "content": json.dumps(shared_context)
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Review and critique the execution results",
-                        "expected_output": "Analysis and improvements of the results",
-                        "agent": self.critic,
-                        "context": [
-                            {
-                                "description": "User's original request",
-                                "expected_output": "Understanding of requirements",
-                                "role": "user",
-                                "content": f"Query: {text}\nVerify if all available file chunks ({len(chunks)}) and context were properly used in the response."
-                            },
-                            {
-                                "description": "System context and execution results",
-                                "expected_output": "Context for critique",
-                                "role": "system",
-                                "content": json.dumps(shared_context)
-                            }
-                        ]
-                    },
-                    {
-                        "description": "Generate final response based on all previous work",
-                        "expected_output": "A comprehensive and helpful response to the user's message",
-                        "agent": self.responder,
-                        "context": [
-                            {
-                                "description": "User's request to respond to",
-                                "expected_output": "Understanding of user needs",
-                                "role": "user",
-                                "content": f"Query: {text}\nIncorporate information from file chunks ({len(chunks)} available) and previous agent outputs to provide a comprehensive response."
-                            },
-                            {
-                                "description": "System context and previous agent outputs",
-                                "expected_output": "Context for response generation",
-                                "role": "system",
-                                "content": json.dumps(shared_context)
-                            }
-                        ]
-                    }
-                ],
+                tasks=tasks,
                 process_callbacks={
                     "on_task_start": lambda agent, task: self._log_agent_start(agent.name, task),
                     "on_task_end": lambda agent, output, task: self._log_agent_end(agent.name, output, task)
                 },
                 verbose=True
             )
-            
-            self.logger.info(
+
+            self.logger.debug(
                 "Starting crew execution",
                 extra={
-                    "context": "crew_execution",
-                    "agents": ["planner", "doer", "critic", "responder"],
-                    "user_id": user.id,
-                    "task_description": text,
+                    "initial_task": tasks[0],
+                    "context_size": len(json.dumps(shared_context)),
                     "available_chunks": len(chunks),
-                    "file_context_size": len(conversation_context["file_context"])
+                    "original_query": text
                 }
             )
             
@@ -260,25 +275,19 @@ class TelegramBot:
             
             # Get all task outputs
             task_outputs = response.tasks_output
-            final_response = str(task_outputs[-1])  # Convert TaskOutput to string
+            final_response = str(task_outputs[-1])
             
-            # Log execution summary
-            self.logger.info(
+            self.logger.debug(
                 "Crew execution completed",
                 extra={
-                    "context": "crew_execution",
-                    "response_length": len(final_response),
-                    "user_id": user.id,
-                    "execution_summary": {
-                        "total_tasks": len(task_outputs),
-                        "task_outputs": [
-                            {
-                                "task_index": idx,
-                                "output_length": len(str(output)),
-                                "output_preview": str(output)[:100]  # Add preview of each output
-                            } for idx, output in enumerate(task_outputs)
-                        ]
-                    }
+                    "task_outputs": [
+                        {
+                            "index": idx,
+                            "content": str(output)[:500],  # Log first 500 chars of each output
+                            "length": len(str(output))
+                        } for idx, output in enumerate(task_outputs)
+                    ],
+                    "final_response_length": len(final_response)
                 }
             )
             
@@ -289,11 +298,11 @@ class TelegramBot:
             self.logger.error(
                 "Error processing message",
                 extra={
-                    "context": "message_handling",
                     "error": str(e),
                     "error_type": type(e).__name__,
                     "user_id": user.id,
-                    "chat_id": message.chat_id
+                    "chat_id": message.chat_id,
+                    "original_query": text
                 },
                 exc_info=True
             )
