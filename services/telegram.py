@@ -11,7 +11,7 @@ from agents.planner import Planner
 from agents.doer import Doer
 from agents.critic import Critic
 from agents.responder import Responder
-from crewai import Crew
+from crewai import Crew, Process
 from config.settings import TELEGRAM_BOT_TOKEN
 from config.logging_config import get_logger
 from utils.llm_config import create_llm_config
