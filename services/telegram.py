@@ -138,7 +138,7 @@ class TelegramBot:
             )
             
             # Get the response from the crew
-            response = await crew.run()
+            response = crew.kickoff()
             
             self.logger.info(
                 "Crew execution completed",
