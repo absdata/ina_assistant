@@ -144,32 +144,88 @@ class TelegramBot:
             # Create and run the crew with enhanced context and callbacks
             crew = Crew(
                 agents=[self.planner, self.doer, self.critic, self.responder],
-                tasks=[{
-                    "description": f"Process and respond to user message: {text}",
-                    "expected_output": "A comprehensive and helpful response to the user's message",
-                    "agent": self.responder,
-                    "context": [
-                        {
-                            "description": "User's input message",
-                            "expected_output": "Understanding of user's request",
-                            "role": "user",
-                            "content": text
-                        },
-                        {
-                            "description": "System context and conversation history",
-                            "expected_output": "Enhanced understanding with context",
-                            "role": "system",
-                            "content": json.dumps({
-                                "chunks": chunks,
-                                "user_id": user.id,
-                                "chat_id": message.chat_id,
-                                "user_context": conversation_context["user_context"],
-                                "chat_context": conversation_context["chat_context"],
-                                "file_context": conversation_context["file_context"]
-                            })
-                        }
-                    ]
-                }],
+                tasks=[
+                    {
+                        "description": "Analyze user request and create a detailed plan",
+                        "expected_output": "A structured plan for handling the user's request",
+                        "agent": self.planner,
+                        "context": [
+                            {
+                                "role": "user",
+                                "content": text
+                            },
+                            {
+                                "role": "system",
+                                "content": json.dumps({
+                                    "chunks": chunks,
+                                    "user_context": conversation_context["user_context"],
+                                    "chat_context": conversation_context["chat_context"],
+                                    "file_context": conversation_context["file_context"]
+                                })
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Execute the plan and process the request",
+                        "expected_output": "Results from executing the plan",
+                        "agent": self.doer,
+                        "context": [
+                            {
+                                "role": "user",
+                                "content": text
+                            },
+                            {
+                                "role": "system",
+                                "content": json.dumps({
+                                    "chunks": chunks,
+                                    "user_context": conversation_context["user_context"],
+                                    "chat_context": conversation_context["chat_context"],
+                                    "file_context": conversation_context["file_context"]
+                                })
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Review and critique the execution results",
+                        "expected_output": "Analysis and improvements of the results",
+                        "agent": self.critic,
+                        "context": [
+                            {
+                                "role": "user",
+                                "content": text
+                            },
+                            {
+                                "role": "system",
+                                "content": json.dumps({
+                                    "chunks": chunks,
+                                    "user_context": conversation_context["user_context"],
+                                    "chat_context": conversation_context["chat_context"],
+                                    "file_context": conversation_context["file_context"]
+                                })
+                            }
+                        ]
+                    },
+                    {
+                        "description": "Generate final response based on all previous work",
+                        "expected_output": "A comprehensive and helpful response to the user's message",
+                        "agent": self.responder,
+                        "context": [
+                            {
+                                "role": "user",
+                                "content": text
+                            },
+                            {
+                                "role": "system",
+                                "content": json.dumps({
+                                    "chunks": chunks,
+                                    "user_context": conversation_context["user_context"],
+                                    "chat_context": conversation_context["chat_context"],
+                                    "file_context": conversation_context["file_context"]
+                                })
+                            }
+                        ]
+                    }
+                ],
                 process_callbacks={
                     "on_task_start": lambda agent, task: self._log_agent_start(agent.name, task),
                     "on_task_end": lambda agent, output, task: self._log_agent_end(agent.name, output, task)
@@ -189,31 +245,32 @@ class TelegramBot:
             
             # Get the response from the crew
             response = crew.kickoff()
-            response_text = str(response.tasks_output[0])  # Get first task output from CrewOutput
+            
+            # Get all task outputs
+            task_outputs = response.tasks_outputs
+            final_response = task_outputs[-1]  # Last output is from the Responder
             
             # Log execution summary
             self.logger.info(
                 "Crew execution completed",
                 extra={
                     "context": "crew_execution",
-                    "response_length": len(response_text),
+                    "response_length": len(final_response),
                     "user_id": user.id,
                     "execution_summary": {
-                        "total_tasks": len(response.tasks),
-                        "total_duration": sum(task.duration for task in response.tasks),
-                        "tasks_breakdown": [
+                        "total_tasks": len(task_outputs),
+                        "task_outputs": [
                             {
-                                "agent": task.agent.name,
-                                "duration": task.duration,
-                                "output_length": len(str(task.output))
-                            } for task in response.tasks
+                                "task_index": idx,
+                                "output_length": len(str(output))
+                            } for idx, output in enumerate(task_outputs)
                         ]
                     }
                 }
             )
             
             # Send the response
-            await message.reply_text(response_text, parse_mode='HTML')
+            await message.reply_text(final_response, parse_mode='HTML')
             
         except Exception as e:
             self.logger.error(
