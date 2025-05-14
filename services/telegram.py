@@ -19,6 +19,7 @@ import asyncio
 import json
 import logging
 from typing import Any, Dict
+from datetime import datetime
 
 class TelegramBot:
     def __init__(self):
@@ -173,147 +174,179 @@ class TelegramBot:
             # Get comprehensive context
             conversation_context = await self._get_conversation_context(message)
             
-            self.logger.debug(
-                "=== Context Information ===",
-                extra={
-                    "context_details": {
-                        "message": text,
-                        "file_context": conversation_context["file_context"][:2],
-                        "chat_context": conversation_context["chat_context"][:2],
-                        "user_context": conversation_context["user_context"][:2],
-                        "counts": {
-                            "file": len(conversation_context["file_context"]),
-                            "chat": len(conversation_context["chat_context"]),
-                            "user": len(conversation_context["user_context"])
-                        }
-                    }
+            # Format conversation history for better readability
+            formatted_history = []
+            for msg in conversation_context["chat_context"]:
+                created_at = msg.get("created_at", "")
+                msg_text = msg.get("message_text", "")
+                is_file = bool(msg.get("file_content"))
+                entry = {
+                    "timestamp": created_at,
+                    "text": msg_text,
+                    "has_file": is_file,
+                    "type": "user_message"
                 }
-            )
-
-            # Prepare shared context
-            shared_context = {
-                "chunks": [str(chunk) for chunk in chunks],
-                "user_context": conversation_context["user_context"],
-                "chat_context": conversation_context["chat_context"],
-                "file_context": conversation_context["file_context"],
-                "original_query": text
-            }
+                formatted_history.append(entry)
             
-            self.logger.debug(
-                "=== Prepared Context for Agents ===",
-                extra={
-                    "agent_context": {
-                        "message": text,
-                        "chunks_count": len(shared_context["chunks"]),
-                        "context_counts": {
-                            "user": len(shared_context["user_context"]),
-                            "chat": len(shared_context["chat_context"]),
-                            "file": len(shared_context["file_context"])
-                        },
-                        "first_chunk_preview": shared_context["chunks"][0][:200] if shared_context["chunks"] else "No chunks available"
-                    }
-                }
-            )
+            # Add file context
+            for file in conversation_context["file_context"]:
+                if file.get("file_content"):
+                    formatted_history.append({
+                        "timestamp": file.get("created_at", ""),
+                        "text": f"[File: {file.get('file_name', 'unknown')}] {file.get('file_content', '')}",
+                        "has_file": True,
+                        "type": "file_content"
+                    })
 
-            # Create tasks with explicit instructions about file content
+            # Sort by timestamp
+            formatted_history.sort(key=lambda x: x["timestamp"])
+            
+            # Create a readable version of the history
+            readable_history = "\n\n".join([
+                f"[{entry['timestamp']}] {'📄 ' if entry['has_file'] else ''}{entry['text'][:500]}"
+                for entry in formatted_history[-5:]  # Last 5 interactions
+            ])
+
+            # Prepare shared context with enhanced history
+            shared_context = {
+                "current_query": {
+                    "text": text,
+                    "timestamp": datetime.now().isoformat(),
+                },
+                "conversation_history": {
+                    "messages": formatted_history,
+                    "total_messages": len(conversation_context["chat_context"]),
+                    "has_files": any(msg.get("file_content") for msg in conversation_context["chat_context"])
+                },
+                "available_context": {
+                    "chunks": [str(chunk) for chunk in chunks],
+                    "file_context": [
+                        {
+                            "name": file.get("file_name"),
+                            "type": file.get("file_type"),
+                            "content": file.get("file_content", "")[:1000]  # Preview of file content
+                        }
+                        for file in conversation_context["file_context"]
+                        if file.get("file_content")
+                    ]
+                }
+            }
+
+            # Create tasks with enhanced context
             tasks = [
                 {
-                    "description": f"Analyze user request: '{text}'",
+                    "description": f"Analyze user request: '{text}' with conversation history",
                     "expected_output": "A structured plan for handling the user's request",
                     "agent": self.planner,
                     "context": [
                         {
-                            "description": "User's request to analyze",
-                            "expected_output": "Understanding of the request",
+                            "description": "User's request and conversation history",
+                            "expected_output": "Understanding of the request in context",
                             "role": "user",
-                            "content": f"Original query: '{text}'\n\nYou have access to {len(chunks)} file chunks and {len(conversation_context['file_context'])} file context entries. Use this information to create a plan."
+                            "content": (
+                                f"Current request: '{text}'\n\n"
+                                f"Recent conversation history:\n{readable_history}\n\n"
+                                f"Available resources:\n"
+                                f"- {len(chunks)} relevant chunks\n"
+                                f"- {len(conversation_context['file_context'])} files\n"
+                                f"- {len(conversation_context['chat_context'])} previous messages\n\n"
+                                "Create a plan that takes into account the conversation history and available information."
+                            )
                         },
                         {
-                            "description": "Available context and information",
-                            "expected_output": "Context for planning",
+                            "description": "Full context data",
+                            "expected_output": "Detailed context for planning",
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
-                    ],
-                    "dependencies": []  # First task has no dependencies
+                    ]
                 },
                 {
-                    "description": "Execute the plan and process the request",
+                    "description": "Execute the plan with context awareness",
                     "expected_output": "Results from executing the plan",
                     "agent": self.doer,
                     "context": [
                         {
-                            "description": "User's request and plan to execute",
-                            "expected_output": "Understanding of the task",
+                            "description": "Task execution with history",
+                            "expected_output": "Context-aware execution",
                             "role": "user",
-                            "content": f"Original query: '{text}'\n\nAnalyze and use the provided {len(chunks)} file chunks and context to answer the query. Each chunk contains relevant information that should be incorporated into the response."
+                            "content": (
+                                f"Current request: '{text}'\n\n"
+                                f"Recent conversation history:\n{readable_history}\n\n"
+                                "Execute the plan using all available context and maintain conversation coherence."
+                            )
                         },
                         {
-                            "description": "Available context and information",
-                            "expected_output": "Context for execution",
+                            "description": "Full context data",
+                            "expected_output": "Detailed context for execution",
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
                     ],
-                    "dependencies": [0]  # Depends on planner's output
+                    "dependencies": [0]
                 },
                 {
-                    "description": "Review and critique the execution results",
+                    "description": "Review execution in conversation context",
                     "expected_output": "Analysis and improvements of the results",
                     "agent": self.critic,
                     "context": [
                         {
-                            "description": "User's original request and execution results",
-                            "expected_output": "Understanding of requirements",
+                            "description": "Review in context",
+                            "expected_output": "Contextual analysis",
                             "role": "user",
-                            "content": f"Original query: '{text}'\n\nVerify that the response incorporates information from all {len(chunks)} available file chunks and context appropriately."
+                            "content": (
+                                f"Current request: '{text}'\n\n"
+                                f"Recent conversation history:\n{readable_history}\n\n"
+                                "Review the response for consistency with conversation history and completeness."
+                            )
                         },
                         {
-                            "description": "Available context and information",
-                            "expected_output": "Context for critique",
+                            "description": "Full context data",
+                            "expected_output": "Detailed context for review",
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
                     ],
-                    "dependencies": [0, 1]  # Depends on planner and doer
+                    "dependencies": [0, 1]
                 },
                 {
-                    "description": "Generate final response based on all previous work",
-                    "expected_output": "A comprehensive and helpful response to the user's message",
+                    "description": "Generate contextually appropriate response",
+                    "expected_output": "A comprehensive and contextually appropriate response",
                     "agent": self.responder,
                     "context": [
                         {
-                            "description": "User's request and all previous work",
-                            "expected_output": "Understanding of user needs",
+                            "description": "Response generation with history",
+                            "expected_output": "Coherent response",
                             "role": "user",
-                            "content": f"Original query: '{text}'\n\nGenerate a comprehensive response using information from the {len(chunks)} available file chunks and previous agent outputs. Ensure all relevant information is included."
+                            "content": (
+                                f"Current request: '{text}'\n\n"
+                                f"Recent conversation history:\n{readable_history}\n\n"
+                                "Generate a response that maintains conversation coherence and incorporates all relevant context."
+                            )
                         },
                         {
-                            "description": "Available context and information",
-                            "expected_output": "Context for response generation",
+                            "description": "Full context data",
+                            "expected_output": "Detailed context for response",
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
                     ],
-                    "dependencies": [0, 1, 2]  # Depends on all previous tasks
+                    "dependencies": [0, 1, 2]
                 }
             ]
 
-            # Log task setup
+            # Log the setup for debugging
             self.logger.debug(
-                "=== Task Configuration ===",
+                "=== Conversation Context Setup ===",
                 extra={
-                    "task_setup": {
-                        "original_query": text,
-                        "tasks": [
-                            {
-                                "index": idx,
-                                "agent": task["agent"].__class__.__name__,
-                                "description": task["description"],
-                                "dependencies": task["dependencies"],
-                                "context_preview": task["context"][0]["content"][:200]
-                            } for idx, task in enumerate(tasks)
-                        ]
+                    "setup_details": {
+                        "current_query": text,
+                        "history_sample": readable_history[:500],
+                        "total_context": {
+                            "messages": len(conversation_context["chat_context"]),
+                            "files": len(conversation_context["file_context"]),
+                            "chunks": len(chunks)
+                        }
                     }
                 }
             )
