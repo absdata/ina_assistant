@@ -116,30 +116,44 @@ class TelegramBot:
             # Process the message
             message_id, chunks = await self._process_message(message)
             
+            # Debug log for chunks
             self.logger.debug(
-                "Message processed",
+                "File chunks retrieved",
                 extra={
-                    "context": "message_processing",
-                    "message_id": message_id,
+                    "context": "file_processing",
                     "chunks_count": len(chunks),
-                    "chunks_content": chunks[:3]  # Log first 3 chunks for debugging
+                    "chunks_sample": [
+                        {
+                            "content": str(chunk)[:200],
+                            "metadata": getattr(chunk, "metadata", {})
+                        } for chunk in chunks[:3]
+                    ] if chunks else []
                 }
             )
             
             # Get comprehensive context
             conversation_context = await self._get_conversation_context(message)
             
+            # Debug log for context
             self.logger.debug(
-                "Retrieved conversation context",
+                "Context details",
                 extra={
-                    "context": "context_retrieval",
-                    "user_context_size": len(conversation_context["user_context"]),
-                    "chat_context_size": len(conversation_context["chat_context"]),
-                    "file_context_size": len(conversation_context["file_context"]),
-                    "user_context_sample": conversation_context["user_context"][:2],
-                    "chat_context_sample": conversation_context["chat_context"][:2]
+                    "context": "context_details",
+                    "file_context_count": len(conversation_context["file_context"]),
+                    "file_context_sample": conversation_context["file_context"][:2],
+                    "chat_context_count": len(conversation_context["chat_context"]),
+                    "user_context_count": len(conversation_context["user_context"])
                 }
             )
+
+            # Prepare shared context for all agents
+            shared_context = {
+                "chunks": chunks,
+                "user_context": conversation_context["user_context"],
+                "chat_context": conversation_context["chat_context"],
+                "file_context": conversation_context["file_context"],
+                "original_query": text
+            }
             
             # Create and run the crew with enhanced context and callbacks
             crew = Crew(
@@ -154,18 +168,13 @@ class TelegramBot:
                                 "description": "User's request to analyze",
                                 "expected_output": "Understanding of the request",
                                 "role": "user",
-                                "content": text
+                                "content": f"Query: {text}\nAvailable file chunks: {len(chunks)}\nFile context entries: {len(conversation_context['file_context'])}"
                             },
                             {
                                 "description": "System context and available information",
                                 "expected_output": "Context for planning",
                                 "role": "system",
-                                "content": json.dumps({
-                                    "chunks": chunks,
-                                    "user_context": conversation_context["user_context"],
-                                    "chat_context": conversation_context["chat_context"],
-                                    "file_context": conversation_context["file_context"]
-                                })
+                                "content": json.dumps(shared_context)
                             }
                         ]
                     },
@@ -178,18 +187,13 @@ class TelegramBot:
                                 "description": "User's request to process",
                                 "expected_output": "Understanding of the task",
                                 "role": "user",
-                                "content": text
+                                "content": f"Query: {text}\nAnalyze and use the provided file chunks ({len(chunks)} available) and context to answer the query."
                             },
                             {
                                 "description": "System context and available information",
                                 "expected_output": "Context for execution",
                                 "role": "system",
-                                "content": json.dumps({
-                                    "chunks": chunks,
-                                    "user_context": conversation_context["user_context"],
-                                    "chat_context": conversation_context["chat_context"],
-                                    "file_context": conversation_context["file_context"]
-                                })
+                                "content": json.dumps(shared_context)
                             }
                         ]
                     },
@@ -202,18 +206,13 @@ class TelegramBot:
                                 "description": "User's original request",
                                 "expected_output": "Understanding of requirements",
                                 "role": "user",
-                                "content": text
+                                "content": f"Query: {text}\nVerify if all available file chunks ({len(chunks)}) and context were properly used in the response."
                             },
                             {
                                 "description": "System context and execution results",
                                 "expected_output": "Context for critique",
                                 "role": "system",
-                                "content": json.dumps({
-                                    "chunks": chunks,
-                                    "user_context": conversation_context["user_context"],
-                                    "chat_context": conversation_context["chat_context"],
-                                    "file_context": conversation_context["file_context"]
-                                })
+                                "content": json.dumps(shared_context)
                             }
                         ]
                     },
@@ -226,18 +225,13 @@ class TelegramBot:
                                 "description": "User's request to respond to",
                                 "expected_output": "Understanding of user needs",
                                 "role": "user",
-                                "content": text
+                                "content": f"Query: {text}\nIncorporate information from file chunks ({len(chunks)} available) and previous agent outputs to provide a comprehensive response."
                             },
                             {
                                 "description": "System context and previous agent outputs",
                                 "expected_output": "Context for response generation",
                                 "role": "system",
-                                "content": json.dumps({
-                                    "chunks": chunks,
-                                    "user_context": conversation_context["user_context"],
-                                    "chat_context": conversation_context["chat_context"],
-                                    "file_context": conversation_context["file_context"]
-                                })
+                                "content": json.dumps(shared_context)
                             }
                         ]
                     }
@@ -255,7 +249,9 @@ class TelegramBot:
                     "context": "crew_execution",
                     "agents": ["planner", "doer", "critic", "responder"],
                     "user_id": user.id,
-                    "task_description": text
+                    "task_description": text,
+                    "available_chunks": len(chunks),
+                    "file_context_size": len(conversation_context["file_context"])
                 }
             )
             
