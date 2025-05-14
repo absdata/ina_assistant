@@ -21,10 +21,6 @@ class Responder(Agent):
     default_name: str = Field(default_factory=get_agent_default_name)
 
     def __init__(self):
-        self.logger.info("Initializing Responder agent", extra={
-            "memory_systems": ["short_term", "long_term", "entity"]
-        })
-        
         super().__init__(
             role='Responder',
             goal='Provide accurate and helpful responses to user queries',
@@ -37,6 +33,10 @@ class Responder(Agent):
                 'entity': self.entity_memory
             }
         )
+        
+        self.logger.info("Initializing Responder agent", extra={
+            "memory_systems": ["short_term", "long_term", "entity"]
+        })
 
     def should_respond(self, message: Dict[str, Any]) -> bool:
         """

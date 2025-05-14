@@ -13,10 +13,6 @@ class Critic(Agent):
     logger: Any = Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization"))
 
     def __init__(self):
-        self.logger.info("Initializing Critic agent", extra={
-            "memory_systems": ["short_term", "long_term", "entity"]
-        })
-        
         super().__init__(
             role='Critic',
             goal='Evaluate and improve the quality of responses',
@@ -30,6 +26,10 @@ class Critic(Agent):
                 'entity': self.entity_memory
             }
         )
+        
+        self.logger.info("Initializing Critic agent", extra={
+            "memory_systems": ["short_term", "long_term", "entity"]
+        })
 
     def ina_evaluate_response(self, response: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """
