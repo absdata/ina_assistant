@@ -1,4 +1,4 @@
-from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
+from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory, RAGStorage
 from utils.azure_embeddings import AzureOpenAIEmbeddingFunction
 from config.settings import (
     AZURE_OPENAI_API_KEY,
@@ -17,10 +17,13 @@ def create_memory_systems():
         api_version=AZURE_OPENAI_API_VERSION
     )
     
-    # Create memory systems with custom embedding function
-    short_term = ShortTermMemory(embedding_function=embedding_function)
-    long_term = LongTermMemory(embedding_function=embedding_function)
-    entity = EntityMemory(embedding_function=embedding_function)
+    # Create RAG storage with custom embedding function
+    rag_storage = RAGStorage(embedding_function=embedding_function)
+    
+    # Create memory systems with RAG storage
+    short_term = ShortTermMemory(storage=rag_storage)
+    long_term = LongTermMemory(storage=rag_storage)
+    entity = EntityMemory(storage=rag_storage)
     
     return {
         'short_term': short_term,
