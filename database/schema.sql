@@ -42,4 +42,4 @@ $$ language 'plpgsql';
 CREATE TRIGGER ina_update_messages_updated_at
     BEFORE UPDATE ON ina_messages
     FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column(); 
+    EXECUTE FUNCTION ina_update_updated_at_column(); 

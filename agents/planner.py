@@ -5,7 +5,7 @@ import json
 class Planner(Agent):
     def __init__(self):
         super().__init__(
-            name="Planner",
+            role="Strategic Planner",
             goal="Break down user requests into clear, actionable subgoals",
             backstory="""You are a strategic planner who excels at breaking down complex
             requests into smaller, manageable tasks. You analyze user intentions and
