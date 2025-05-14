@@ -14,16 +14,22 @@ from agents.responder import Responder
 from crewai import Crew
 from config.settings import TELEGRAM_BOT_TOKEN
 from config.logging_config import get_logger
+from utils.llm_config import create_llm_config
 import asyncio
 import json
 
 class TelegramBot:
     def __init__(self):
+        # Create LLM configuration
+        llm_config = create_llm_config()
+        
+        # Initialize agents with LLM configuration
         self.file_handler = FileHandler()
-        self.planner = Planner()
-        self.doer = Doer()
-        self.critic = Critic()
-        self.responder = Responder()
+        self.planner = Planner(llm=llm_config)
+        self.doer = Doer(llm=llm_config)
+        self.critic = Critic(llm=llm_config)
+        self.responder = Responder(llm=llm_config)
+        
         self.logger = get_logger("services.telegram", "bot_service")
         self.logger.info("Initializing Telegram bot service", extra={
             "agents": ["planner", "doer", "critic", "responder"],
