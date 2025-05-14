@@ -4,6 +4,7 @@ from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
 import json
 from config.logging_config import get_logger
 from pydantic import Field, BaseModel
+from utils.memory_config import create_memory_systems
 
 class Critic(Agent):
     model_config: ClassVar[dict] = {"arbitrary_types_allowed": True}
@@ -13,12 +14,8 @@ class Critic(Agent):
     logger: Any = Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization"))
 
     def __init__(self, **data):
-        # Initialize memory systems first
-        memory_systems = {
-            'short_term': ShortTermMemory(),
-            'long_term': LongTermMemory(),
-            'entity': EntityMemory()
-        }
+        # Initialize memory systems with Azure embeddings
+        memory_systems = create_memory_systems()
         
         # Initialize logger
         logger = get_logger("agents.critic", "agent_initialization")

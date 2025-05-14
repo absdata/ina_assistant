@@ -11,6 +11,7 @@ from config.settings import (
     SUPPORTED_DOCUMENT_TYPES
 )
 from pydantic import Field, BaseModel
+from utils.memory_config import create_memory_systems
 
 class Responder(Agent):
     model_config: ClassVar[dict] = {"arbitrary_types_allowed": True}
@@ -21,12 +22,8 @@ class Responder(Agent):
     default_name: str = Field(default_factory=get_agent_default_name)
 
     def __init__(self, **data):
-        # Initialize memory systems first
-        memory_systems = {
-            'short_term': ShortTermMemory(),
-            'long_term': LongTermMemory(),
-            'entity': EntityMemory()
-        }
+        # Initialize memory systems with Azure embeddings
+        memory_systems = create_memory_systems()
         
         # Initialize logger and default name
         logger = get_logger("agents.responder", "agent_initialization")
