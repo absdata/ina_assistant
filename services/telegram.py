@@ -145,18 +145,19 @@ class TelegramBot:
             
             # Get the response from the crew
             response = crew.kickoff()
+            response_text = str(response.result())  # Convert CrewOutput to string
             
             self.logger.info(
                 "Crew execution completed",
                 extra={
                     "context": "crew_execution",
-                    "response_length": len(response),
+                    "response_length": len(response_text),
                     "user_id": user.id
                 }
             )
             
             # Send the response
-            await message.reply_text(response, parse_mode='HTML')
+            await message.reply_text(response_text, parse_mode='HTML')
             
         except Exception as e:
             self.logger.error(
