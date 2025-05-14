@@ -38,6 +38,6 @@ def create_memory_systems():
     )
 
     return {
-        'short_term_memory': short_term_memory,
-        'long_term_memory': long_term_memory
+        'short_term': short_term_memory,
+        'long_term': long_term_memory
     }
