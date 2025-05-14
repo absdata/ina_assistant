@@ -13,7 +13,17 @@ class Critic(Agent):
     logger: Any = Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization"))
 
     def __init__(self, **data):
-        # Initialize parent class first
+        # Initialize memory systems first
+        memory_systems = {
+            'short_term': ShortTermMemory(),
+            'long_term': LongTermMemory(),
+            'entity': EntityMemory()
+        }
+        
+        # Initialize logger
+        logger = get_logger("agents.critic", "agent_initialization")
+        
+        # Initialize parent class
         super().__init__(
             role='Critic',
             goal='Evaluate and improve the quality of responses',
@@ -21,13 +31,15 @@ class Critic(Agent):
             Your role is to evaluate responses for accuracy, completeness, and helpfulness,
             while suggesting improvements when necessary.""",
             allow_delegation=False,
-            memory={
-                'short_term': self.short_term_memory,
-                'long_term': self.long_term_memory,
-                'entity': self.entity_memory
-            },
+            memory=memory_systems,
             **data
         )
+        
+        # Store initialized instances
+        self.short_term_memory = memory_systems['short_term']
+        self.long_term_memory = memory_systems['long_term']
+        self.entity_memory = memory_systems['entity']
+        self.logger = logger
         
         self.logger.info("Initializing Critic agent", extra={
             "memory_systems": ["short_term", "long_term", "entity"]

@@ -9,7 +9,10 @@ class Doer(Agent):
     file_handler: FileHandler = Field(default_factory=FileHandler)
 
     def __init__(self, **data):
-        # Initialize parent class first
+        # Initialize file handler first
+        file_handler_instance = FileHandler()
+        
+        # Initialize parent class
         super().__init__(
             role="Task Executor",
             goal="Execute tasks and perform research efficiently",
@@ -18,6 +21,9 @@ class Doer(Agent):
             allow_delegation=False,
             **data
         )
+        
+        # Store initialized instance
+        self.file_handler = file_handler_instance
 
     def execute_plan(self, plan: Dict) -> Dict:
         """

@@ -21,20 +21,34 @@ class Responder(Agent):
     default_name: str = Field(default_factory=get_agent_default_name)
 
     def __init__(self, **data):
-        # Initialize parent class first
+        # Initialize memory systems first
+        memory_systems = {
+            'short_term': ShortTermMemory(),
+            'long_term': LongTermMemory(),
+            'entity': EntityMemory()
+        }
+        
+        # Initialize logger and default name
+        logger = get_logger("agents.responder", "agent_initialization")
+        default_name = get_agent_default_name()
+        
+        # Initialize parent class
         super().__init__(
             role='Responder',
             goal='Provide accurate and helpful responses to user queries',
             backstory="""You are an expert responder with deep knowledge in various fields.
             Your role is to provide accurate, complete, and helpful responses to user queries.""",
             allow_delegation=False,
-            memory={
-                'short_term': self.short_term_memory,
-                'long_term': self.long_term_memory,
-                'entity': self.entity_memory
-            },
+            memory=memory_systems,
             **data
         )
+        
+        # Store initialized instances
+        self.short_term_memory = memory_systems['short_term']
+        self.long_term_memory = memory_systems['long_term']
+        self.entity_memory = memory_systems['entity']
+        self.logger = logger
+        self.default_name = default_name
         
         self.logger.info("Initializing Responder agent", extra={
             "memory_systems": ["short_term", "long_term", "entity"]
