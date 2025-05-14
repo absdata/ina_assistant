@@ -7,14 +7,17 @@ from pydantic import Field, BaseModel
 
 class Critic(Agent):
     model_config = {"arbitrary_types_allowed": True}
+    
+    # Define model fields
+    model_fields = {
+        "short_term_memory": (ShortTermMemory, Field(default_factory=ShortTermMemory)),
+        "long_term_memory": (LongTermMemory, Field(default_factory=LongTermMemory)),
+        "entity_memory": (EntityMemory, Field(default_factory=EntityMemory)),
+        "logger": (Any, Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization")))
+    }
 
-    def __init__(self):
-        # Initialize memory systems first
-        self.short_term_memory = ShortTermMemory()
-        self.long_term_memory = LongTermMemory()
-        self.entity_memory = EntityMemory()
-        self.logger = get_logger("agents.critic", "agent_initialization")
-
+    def __init__(self, **data):
+        # Initialize parent class first
         super().__init__(
             role='Critic',
             goal='Evaluate and improve the quality of responses',
@@ -26,7 +29,8 @@ class Critic(Agent):
                 'short_term': self.short_term_memory,
                 'long_term': self.long_term_memory,
                 'entity': self.entity_memory
-            }
+            },
+            **data
         )
         
         self.logger.info("Initializing Critic agent", extra={

@@ -7,17 +7,21 @@ from typing import Any
 
 class Doer(Agent):
     model_config = {"arbitrary_types_allowed": True}
+    
+    # Define model fields
+    model_fields = {
+        "file_handler": (FileHandler, Field(default_factory=FileHandler))
+    }
 
-    def __init__(self):
-        # Initialize file handler first
-        self.file_handler = FileHandler()
-
+    def __init__(self, **data):
+        # Initialize parent class first
         super().__init__(
             role="Task Executor",
             goal="Execute tasks and perform research efficiently",
             backstory="""You are a highly efficient executor who gets things done.
             You excel at research, analysis, and completing tasks with attention to detail.""",
-            allow_delegation=False
+            allow_delegation=False,
+            **data
         )
 
     def execute_plan(self, plan: Dict) -> Dict:

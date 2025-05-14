@@ -14,15 +14,18 @@ from pydantic import Field, BaseModel
 
 class Responder(Agent):
     model_config = {"arbitrary_types_allowed": True}
+    
+    # Define model fields
+    model_fields = {
+        "short_term_memory": (ShortTermMemory, Field(default_factory=ShortTermMemory)),
+        "long_term_memory": (LongTermMemory, Field(default_factory=LongTermMemory)),
+        "entity_memory": (EntityMemory, Field(default_factory=EntityMemory)),
+        "logger": (Any, Field(default_factory=lambda: get_logger("agents.responder", "agent_initialization"))),
+        "default_name": (str, Field(default_factory=get_agent_default_name))
+    }
 
-    def __init__(self):
-        # Initialize memory systems and other attributes first
-        self.short_term_memory = ShortTermMemory()
-        self.long_term_memory = LongTermMemory()
-        self.entity_memory = EntityMemory()
-        self.logger = get_logger("agents.responder", "agent_initialization")
-        self.default_name = get_agent_default_name()
-
+    def __init__(self, **data):
+        # Initialize parent class first
         super().__init__(
             role='Responder',
             goal='Provide accurate and helpful responses to user queries',
@@ -33,7 +36,8 @@ class Responder(Agent):
                 'short_term': self.short_term_memory,
                 'long_term': self.long_term_memory,
                 'entity': self.entity_memory
-            }
+            },
+            **data
         )
         
         self.logger.info("Initializing Responder agent", extra={
