@@ -232,103 +232,104 @@ class TelegramBot:
                 }
             }
 
-            # Create tasks with enhanced context
-            base_context = [
-                {
-                    "description": "Original user request and conversation history",
-                    "role": "system",
-                    "expected_output": "Understanding of the complete conversation context",
-                    "content": (
-                        f"Original request: '{text}'\n\n"
-                        f"Recent conversation history:\n{readable_history}"
-                    )
-                },
-                {
-                    "description": "Available context and resources",
-                    "role": "system",
-                    "expected_output": "Access to all available contextual information",
-                    "content": json.dumps(shared_context)
-                }
-            ]
+            # Create base context with all required fields
+            request_context = {
+                "description": "Original user request and conversation history",
+                "role": "system",
+                "expected_output": "Understanding of the complete conversation context",
+                "content": (
+                    f"Original request: '{text}'\n\n"
+                    f"Recent conversation history:\n{readable_history}"
+                )
+            }
+            
+            resources_context = {
+                "description": "Available context and resources",
+                "role": "system",
+                "expected_output": "Access to all available contextual information",
+                "content": json.dumps(shared_context)
+            }
 
+            # Define task-specific contexts
+            planner_context = {
+                "description": "Planning instructions",
+                "role": "user",
+                "expected_output": "A clear plan with specific steps for execution",
+                "content": (
+                    "Create a detailed plan that:\n"
+                    "1. Addresses the user's request directly\n"
+                    "2. Takes into account the conversation history\n"
+                    "3. Utilizes available resources and context\n"
+                    "4. Specifies clear steps for other agents to follow"
+                )
+            }
+
+            doer_context = {
+                "description": "Execution instructions",
+                "role": "user",
+                "expected_output": "Concrete results from following the plan",
+                "content": (
+                    "Execute the plan from the Strategic Planner while:\n"
+                    "1. Following the specified steps\n"
+                    "2. Maintaining conversation coherence\n"
+                    "3. Using all available context and resources\n"
+                    "4. Providing clear results for review"
+                )
+            }
+
+            critic_context = {
+                "description": "Review instructions",
+                "role": "user",
+                "expected_output": "Detailed analysis and improvement suggestions",
+                "content": (
+                    "Review the execution results while considering:\n"
+                    "1. Accuracy and completeness of the response\n"
+                    "2. Consistency with conversation history\n"
+                    "3. Proper use of available context\n"
+                    "4. Suggest specific improvements if needed"
+                )
+            }
+
+            responder_context = {
+                "description": "Response generation instructions",
+                "role": "user",
+                "expected_output": "A clear, coherent, and contextually appropriate response",
+                "content": (
+                    "Generate a final response that:\n"
+                    "1. Directly addresses the user's request\n"
+                    "2. Incorporates the execution results\n"
+                    "3. Maintains conversation coherence\n"
+                    "4. Uses appropriate tone and formatting"
+                )
+            }
+
+            # Create tasks with properly structured contexts
             tasks = [
                 {
                     "description": f"Analyze user request: '{text}' with conversation history",
                     "expected_output": "A structured plan for handling the user's request",
                     "agent": self.planner,
-                    "context": base_context + [
-                        {
-                            "description": "Planning instructions",
-                            "role": "user",
-                            "expected_output": "A clear plan with specific steps for execution",
-                            "content": (
-                                "Create a detailed plan that:\n"
-                                "1. Addresses the user's request directly\n"
-                                "2. Takes into account the conversation history\n"
-                                "3. Utilizes available resources and context\n"
-                                "4. Specifies clear steps for other agents to follow"
-                            )
-                        }
-                    ]
+                    "context": [request_context, resources_context, planner_context]
                 },
                 {
                     "description": "Execute the plan with context awareness",
                     "expected_output": "Results from executing the plan",
                     "agent": self.doer,
-                    "context": base_context + [
-                        {
-                            "description": "Execution instructions",
-                            "role": "user",
-                            "expected_output": "Concrete results from following the plan",
-                            "content": (
-                                "Execute the plan from the Strategic Planner while:\n"
-                                "1. Following the specified steps\n"
-                                "2. Maintaining conversation coherence\n"
-                                "3. Using all available context and resources\n"
-                                "4. Providing clear results for review"
-                            )
-                        }
-                    ],
+                    "context": [request_context, resources_context, doer_context],
                     "dependencies": [0]
                 },
                 {
                     "description": "Review execution in conversation context",
                     "expected_output": "Analysis and improvements of the results",
                     "agent": self.critic,
-                    "context": base_context + [
-                        {
-                            "description": "Review instructions",
-                            "role": "user",
-                            "expected_output": "Detailed analysis and improvement suggestions",
-                            "content": (
-                                "Review the execution results while considering:\n"
-                                "1. Accuracy and completeness of the response\n"
-                                "2. Consistency with conversation history\n"
-                                "3. Proper use of available context\n"
-                                "4. Suggest specific improvements if needed"
-                            )
-                        }
-                    ],
+                    "context": [request_context, resources_context, critic_context],
                     "dependencies": [0, 1]
                 },
                 {
                     "description": "Generate contextually appropriate response",
                     "expected_output": "A comprehensive and contextually appropriate response",
                     "agent": self.responder,
-                    "context": base_context + [
-                        {
-                            "description": "Response generation instructions",
-                            "role": "user",
-                            "expected_output": "A clear, coherent, and contextually appropriate response",
-                            "content": (
-                                "Generate a final response that:\n"
-                                "1. Directly addresses the user's request\n"
-                                "2. Incorporates the execution results\n"
-                                "3. Maintains conversation coherence\n"
-                                "4. Uses appropriate tone and formatting"
-                            )
-                        }
-                    ],
+                    "context": [request_context, resources_context, responder_context],
                     "dependencies": [0, 1, 2]
                 }
             ]
@@ -356,7 +357,8 @@ class TelegramBot:
                     "on_task_start": lambda agent, task: self._log_agent_start(agent.name, task),
                     "on_task_end": lambda agent, output, task: self._log_agent_end(agent.name, output, task)
                 },
-                verbose=True
+                verbose=True,
+                memory=True
             )
 
             self.logger.debug(
