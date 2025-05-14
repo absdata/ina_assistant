@@ -17,6 +17,7 @@ from config.logging_config import get_logger
 from utils.llm_config import create_llm_config
 import asyncio
 import json
+from typing import Any, Dict
 
 class TelegramBot:
     def __init__(self):
@@ -55,6 +56,32 @@ class TelegramBot:
             "Just start your message with 'Inna' or 'Ina' and I'll be happy to help."
         )
         await update.message.reply_text(welcome_message)
+
+    def _log_agent_start(self, agent_name: str, task: Dict[str, Any]) -> None:
+        """Log when an agent starts working on a task."""
+        self.logger.info(
+            f"Agent {agent_name} starting work",
+            extra={
+                "context": "agent_execution",
+                "agent": agent_name,
+                "task_description": task.get("description", ""),
+                "expected_output": task.get("expected_output", ""),
+                "stage": "start"
+            }
+        )
+
+    def _log_agent_end(self, agent_name: str, output: str, task: Dict[str, Any]) -> None:
+        """Log when an agent completes a task."""
+        self.logger.info(
+            f"Agent {agent_name} completed task",
+            extra={
+                "context": "agent_execution",
+                "agent": agent_name,
+                "output_preview": output[:200] if output else "",
+                "task_description": task.get("description", ""),
+                "stage": "complete"
+            }
+        )
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle incoming messages with enhanced context awareness."""
@@ -109,12 +136,12 @@ class TelegramBot:
                     "user_context_size": len(conversation_context["user_context"]),
                     "chat_context_size": len(conversation_context["chat_context"]),
                     "file_context_size": len(conversation_context["file_context"]),
-                    "user_context_sample": conversation_context["user_context"][:2],  # Log first 2 context items
+                    "user_context_sample": conversation_context["user_context"][:2],
                     "chat_context_sample": conversation_context["chat_context"][:2]
                 }
             )
             
-            # Create and run the crew with enhanced context
+            # Create and run the crew with enhanced context and callbacks
             crew = Crew(
                 agents=[self.planner, self.doer, self.critic, self.responder],
                 tasks=[{
@@ -142,7 +169,12 @@ class TelegramBot:
                             })
                         }
                     ]
-                }]
+                }],
+                process_callbacks={
+                    "on_task_start": lambda agent, task: self._log_agent_start(agent.name, task),
+                    "on_task_end": lambda agent, output, task: self._log_agent_end(agent.name, output, task)
+                },
+                verbose=True  # Enable verbose mode
             )
             
             self.logger.info(
@@ -159,19 +191,7 @@ class TelegramBot:
             response = crew.kickoff()
             response_text = str(response.tasks_output[0])  # Get first task output from CrewOutput
             
-            # Log detailed agent outputs
-            for i, task in enumerate(response.tasks):
-                self.logger.debug(
-                    f"Agent task completion",
-                    extra={
-                        "context": "agent_execution",
-                        "task_index": i,
-                        "agent_name": task.agent.name,
-                        "task_output": task.output[:500],  # Log first 500 chars of output
-                        "task_duration": task.duration
-                    }
-                )
-            
+            # Log execution summary
             self.logger.info(
                 "Crew execution completed",
                 extra={
@@ -180,7 +200,14 @@ class TelegramBot:
                     "user_id": user.id,
                     "execution_summary": {
                         "total_tasks": len(response.tasks),
-                        "total_duration": sum(task.duration for task in response.tasks)
+                        "total_duration": sum(task.duration for task in response.tasks),
+                        "tasks_breakdown": [
+                            {
+                                "agent": task.agent.name,
+                                "duration": task.duration,
+                                "output_length": len(str(task.output))
+                            } for task in response.tasks
+                        ]
                     }
                 }
             )
