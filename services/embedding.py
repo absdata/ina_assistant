@@ -7,6 +7,7 @@ from config.settings import (
     AZURE_OPENAI_API_VERSION,
     AZURE_OPENAI_EMBEDDING_DEPLOYMENT
 )
+from utils.vector_compression import VectorCompressor
 
 class EmbeddingService:
     def __init__(self):
@@ -16,16 +17,17 @@ class EmbeddingService:
             azure_endpoint=AZURE_OPENAI_ENDPOINT
         )
         self.model = AZURE_OPENAI_EMBEDDING_DEPLOYMENT
+        self.compressor = VectorCompressor()
 
     def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
-        Get embeddings for a list of texts using Azure OpenAI.
+        Get compressed embeddings for a list of texts using Azure OpenAI.
         
         Args:
             texts (List[str]): List of text strings to embed
             
         Returns:
-            List[List[float]]: List of embedding vectors
+            List[List[float]]: List of compressed embedding vectors
         """
         if not texts:
             return []
@@ -40,31 +42,32 @@ class EmbeddingService:
                 model=self.model,
                 input=batch
             )
-            batch_embeddings = [item.embedding for item in response.data]
+            batch_embeddings = [data.embedding for data in response.data]
             all_embeddings.extend(batch_embeddings)
             
-        return all_embeddings
+        # Compress embeddings to target dimension
+        return self.compressor.compress(all_embeddings)
 
     def get_embedding(self, text: str) -> List[float]:
         """
-        Get embedding for a single text using Azure OpenAI.
+        Get compressed embedding for a single text using Azure OpenAI.
         
         Args:
             text (str): Text to embed
             
         Returns:
-            List[float]: Embedding vector
+            List[float]: Compressed embedding vector
         """
         embeddings = self.get_embeddings([text])
         return embeddings[0] if embeddings else []
 
     def calculate_similarity(self, embedding1: List[float], embedding2: List[float]) -> float:
         """
-        Calculate cosine similarity between two embeddings.
+        Calculate cosine similarity between two compressed embeddings.
         
         Args:
-            embedding1 (List[float]): First embedding vector
-            embedding2 (List[float]): Second embedding vector
+            embedding1 (List[float]): First compressed embedding vector
+            embedding2 (List[float]): Second compressed embedding vector
             
         Returns:
             float: Cosine similarity score between 0 and 1
