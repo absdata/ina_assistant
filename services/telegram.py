@@ -359,7 +359,8 @@ class TelegramBot:
                 },
                 process=Process.sequential,
                 verbose=True,
-                memory=True
+                memory=True,
+                embedder={"provider": "azure"}
             )
 
             self.logger.debug(
