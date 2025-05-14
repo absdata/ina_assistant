@@ -264,7 +264,7 @@ class TelegramBot:
             
             # Get all task outputs
             task_outputs = response.tasks_output
-            final_response = task_outputs[-1]  # Last output is from the Responder
+            final_response = str(task_outputs[-1])  # Convert TaskOutput to string
             
             # Log execution summary
             self.logger.info(
@@ -278,7 +278,8 @@ class TelegramBot:
                         "task_outputs": [
                             {
                                 "task_index": idx,
-                                "output_length": len(str(output))
+                                "output_length": len(str(output)),
+                                "output_preview": str(output)[:100]  # Add preview of each output
                             } for idx, output in enumerate(task_outputs)
                         ]
                     }
