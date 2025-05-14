@@ -233,31 +233,38 @@ class TelegramBot:
             }
 
             # Create tasks with enhanced context
+            base_context = [
+                {
+                    "description": "Original user request and conversation history",
+                    "role": "system",
+                    "content": (
+                        f"Original request: '{text}'\n\n"
+                        f"Recent conversation history:\n{readable_history}"
+                    )
+                },
+                {
+                    "description": "Available context and resources",
+                    "role": "system",
+                    "content": json.dumps(shared_context)
+                }
+            ]
+
             tasks = [
                 {
                     "description": f"Analyze user request: '{text}' with conversation history",
                     "expected_output": "A structured plan for handling the user's request",
                     "agent": self.planner,
-                    "context": [
+                    "context": base_context + [
                         {
-                            "description": "User's request and conversation history",
-                            "expected_output": "Understanding of the request in context",
+                            "description": "Planning instructions",
                             "role": "user",
                             "content": (
-                                f"Current request: '{text}'\n\n"
-                                f"Recent conversation history:\n{readable_history}\n\n"
-                                f"Available resources:\n"
-                                f"- {len(chunks)} relevant chunks\n"
-                                f"- {len(conversation_context['file_context'])} files\n"
-                                f"- {len(conversation_context['chat_context'])} previous messages\n\n"
-                                "Create a plan that takes into account the conversation history and available information."
+                                "Create a detailed plan that:\n"
+                                "1. Addresses the user's request directly\n"
+                                "2. Takes into account the conversation history\n"
+                                "3. Utilizes available resources and context\n"
+                                "4. Specifies clear steps for other agents to follow"
                             )
-                        },
-                        {
-                            "description": "Full context data",
-                            "expected_output": "Detailed context for planning",
-                            "role": "system",
-                            "content": json.dumps(shared_context)
                         }
                     ]
                 },
@@ -265,22 +272,17 @@ class TelegramBot:
                     "description": "Execute the plan with context awareness",
                     "expected_output": "Results from executing the plan",
                     "agent": self.doer,
-                    "context": [
+                    "context": base_context + [
                         {
-                            "description": "Task execution with history",
-                            "expected_output": "Context-aware execution",
+                            "description": "Execution instructions",
                             "role": "user",
                             "content": (
-                                f"Current request: '{text}'\n\n"
-                                f"Recent conversation history:\n{readable_history}\n\n"
-                                "Execute the plan using all available context and maintain conversation coherence."
+                                "Execute the plan from the Strategic Planner while:\n"
+                                "1. Following the specified steps\n"
+                                "2. Maintaining conversation coherence\n"
+                                "3. Using all available context and resources\n"
+                                "4. Providing clear results for review"
                             )
-                        },
-                        {
-                            "description": "Full context data",
-                            "expected_output": "Detailed context for execution",
-                            "role": "system",
-                            "content": json.dumps(shared_context)
                         }
                     ],
                     "dependencies": [0]
@@ -289,22 +291,17 @@ class TelegramBot:
                     "description": "Review execution in conversation context",
                     "expected_output": "Analysis and improvements of the results",
                     "agent": self.critic,
-                    "context": [
+                    "context": base_context + [
                         {
-                            "description": "Review in context",
-                            "expected_output": "Contextual analysis",
+                            "description": "Review instructions",
                             "role": "user",
                             "content": (
-                                f"Current request: '{text}'\n\n"
-                                f"Recent conversation history:\n{readable_history}\n\n"
-                                "Review the response for consistency with conversation history and completeness."
+                                "Review the execution results while considering:\n"
+                                "1. Accuracy and completeness of the response\n"
+                                "2. Consistency with conversation history\n"
+                                "3. Proper use of available context\n"
+                                "4. Suggest specific improvements if needed"
                             )
-                        },
-                        {
-                            "description": "Full context data",
-                            "expected_output": "Detailed context for review",
-                            "role": "system",
-                            "content": json.dumps(shared_context)
                         }
                     ],
                     "dependencies": [0, 1]
@@ -313,22 +310,17 @@ class TelegramBot:
                     "description": "Generate contextually appropriate response",
                     "expected_output": "A comprehensive and contextually appropriate response",
                     "agent": self.responder,
-                    "context": [
+                    "context": base_context + [
                         {
-                            "description": "Response generation with history",
-                            "expected_output": "Coherent response",
+                            "description": "Response generation instructions",
                             "role": "user",
                             "content": (
-                                f"Current request: '{text}'\n\n"
-                                f"Recent conversation history:\n{readable_history}\n\n"
-                                "Generate a response that maintains conversation coherence and incorporates all relevant context."
+                                "Generate a final response that:\n"
+                                "1. Directly addresses the user's request\n"
+                                "2. Incorporates the execution results\n"
+                                "3. Maintains conversation coherence\n"
+                                "4. Uses appropriate tone and formatting"
                             )
-                        },
-                        {
-                            "description": "Full context data",
-                            "expected_output": "Detailed context for response",
-                            "role": "system",
-                            "content": json.dumps(shared_context)
                         }
                     ],
                     "dependencies": [0, 1, 2]
