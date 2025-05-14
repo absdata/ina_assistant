@@ -5,7 +5,7 @@ from config.settings import (
     AZURE_OPENAI_API_KEY,
     AZURE_OPENAI_ENDPOINT,
     AZURE_OPENAI_API_VERSION,
-    AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME
+    AZURE_OPENAI_EMBEDDING_DEPLOYMENT
 )
 
 class EmbeddingService:
@@ -15,7 +15,7 @@ class EmbeddingService:
             api_version=AZURE_OPENAI_API_VERSION,
             azure_endpoint=AZURE_OPENAI_ENDPOINT
         )
-        self.model = AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME
+        self.model = AZURE_OPENAI_EMBEDDING_DEPLOYMENT
 
     def get_embeddings(self, texts: List[str]) -> List[List[float]]:
         """
