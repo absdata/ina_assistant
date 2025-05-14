@@ -18,7 +18,8 @@ def create_memory_systems():
             "deployment_id": os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large"),
             "api_key_env_var": os.getenv("AZURE_OPENAI_API_KEY"),
             "endpoint_env_var": os.getenv("AZURE_OPENAI_ENDPOINT"),
-            "api_base": os.getenv("AZURE_OPENAI_API_VERSION", "2023-05-15")
+            "api_base": os.getenv("AZURE_OPENAI_ENDPOINT", "https://getinn-openai.openai.azure.com"),
+            "api_version": os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
         }
     }
 
