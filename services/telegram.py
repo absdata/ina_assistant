@@ -99,17 +99,22 @@ class TelegramBot:
             
         # Remove trigger words (Inna/Ina) from the beginning of the message
         cleaned_text = text.lower()
+        original_text = text  # Store original text before cleaning
         for trigger in ["inna", "ina"]:
             if cleaned_text.startswith(trigger):
                 text = text[len(trigger):].strip()
                 break
         
         self.logger.debug(
-            "Processing message",
+            "=== Starting Message Processing ===",
             extra={
-                "original_text": text,
-                "user_id": user.id,
-                "chat_id": message.chat_id
+                "message_details": {
+                    "original_message": original_text,
+                    "cleaned_message": text,
+                    "user_id": user.id,
+                    "chat_id": message.chat_id,
+                    "username": user.username
+                }
             }
         )
             
@@ -118,16 +123,20 @@ class TelegramBot:
             message_id, chunks = await self._process_message(message)
             
             self.logger.debug(
-                "File chunks details",
+                "=== Retrieved File Chunks ===",
                 extra={
-                    "chunks_count": len(chunks),
-                    "chunks_preview": [
-                        {
-                            "content": str(chunk)[:500],
-                            "metadata": getattr(chunk, "metadata", {}),
-                            "type": type(chunk).__name__
-                        } for chunk in chunks[:2]
-                    ] if chunks else []
+                    "chunks_details": {
+                        "total_chunks": len(chunks),
+                        "chunks_preview": [
+                            {
+                                "index": idx,
+                                "content": str(chunk)[:500],
+                                "metadata": getattr(chunk, "metadata", {}),
+                                "type": type(chunk).__name__
+                            } for idx, chunk in enumerate(chunks[:2])
+                        ] if chunks else [],
+                        "message": text  # Include the message here too
+                    }
                 }
             )
             
@@ -135,22 +144,25 @@ class TelegramBot:
             conversation_context = await self._get_conversation_context(message)
             
             self.logger.debug(
-                "Full context details",
+                "=== Context Information ===",
                 extra={
-                    "file_context": conversation_context["file_context"][:2],
-                    "chat_context": conversation_context["chat_context"][:2],
-                    "user_context": conversation_context["user_context"][:2],
-                    "context_counts": {
-                        "file": len(conversation_context["file_context"]),
-                        "chat": len(conversation_context["chat_context"]),
-                        "user": len(conversation_context["user_context"])
+                    "context_details": {
+                        "message": text,
+                        "file_context": conversation_context["file_context"][:2],
+                        "chat_context": conversation_context["chat_context"][:2],
+                        "user_context": conversation_context["user_context"][:2],
+                        "counts": {
+                            "file": len(conversation_context["file_context"]),
+                            "chat": len(conversation_context["chat_context"]),
+                            "user": len(conversation_context["user_context"])
+                        }
                     }
                 }
             )
 
             # Prepare shared context
             shared_context = {
-                "chunks": [str(chunk) for chunk in chunks],  # Convert chunks to strings
+                "chunks": [str(chunk) for chunk in chunks],
                 "user_context": conversation_context["user_context"],
                 "chat_context": conversation_context["chat_context"],
                 "file_context": conversation_context["file_context"],
@@ -158,14 +170,17 @@ class TelegramBot:
             }
             
             self.logger.debug(
-                "Prepared shared context",
+                "=== Prepared Context for Agents ===",
                 extra={
-                    "context_structure": {
+                    "agent_context": {
+                        "message": text,
                         "chunks_count": len(shared_context["chunks"]),
-                        "user_context_count": len(shared_context["user_context"]),
-                        "chat_context_count": len(shared_context["chat_context"]),
-                        "file_context_count": len(shared_context["file_context"]),
-                        "query": shared_context["original_query"]
+                        "context_counts": {
+                            "user": len(shared_context["user_context"]),
+                            "chat": len(shared_context["chat_context"]),
+                            "file": len(shared_context["file_context"])
+                        },
+                        "first_chunk_preview": shared_context["chunks"][0][:200] if shared_context["chunks"] else "No chunks available"
                     }
                 }
             )
@@ -173,7 +188,7 @@ class TelegramBot:
             # Create tasks with explicit instructions about file content
             tasks = [
                 {
-                    "description": "Analyze user request and create a detailed plan",
+                    "description": f"Analyze user request: '{text}'",
                     "expected_output": "A structured plan for handling the user's request",
                     "agent": self.planner,
                     "context": [
@@ -181,7 +196,7 @@ class TelegramBot:
                             "description": "User's request to analyze",
                             "expected_output": "Understanding of the request",
                             "role": "user",
-                            "content": f"Original query: {text}\n\nYou have access to {len(chunks)} file chunks and {len(conversation_context['file_context'])} file context entries. Use this information to create a plan."
+                            "content": f"Original query: '{text}'\n\nYou have access to {len(chunks)} file chunks and {len(conversation_context['file_context'])} file context entries. Use this information to create a plan."
                         },
                         {
                             "description": "Available context and information",
@@ -261,12 +276,20 @@ class TelegramBot:
             )
 
             self.logger.debug(
-                "Starting crew execution",
+                "=== Starting Crew Execution ===",
                 extra={
-                    "initial_task": tasks[0],
-                    "context_size": len(json.dumps(shared_context)),
-                    "available_chunks": len(chunks),
-                    "original_query": text
+                    "execution_details": {
+                        "message": text,
+                        "first_task": {
+                            "description": tasks[0]["description"],
+                            "agent": tasks[0]["agent"].__class__.__name__,
+                            "context_preview": tasks[0]["context"][0]["content"][:200]
+                        },
+                        "available_resources": {
+                            "chunks": len(chunks),
+                            "file_context": len(conversation_context["file_context"])
+                        }
+                    }
                 }
             )
             
@@ -278,16 +301,21 @@ class TelegramBot:
             final_response = str(task_outputs[-1])
             
             self.logger.debug(
-                "Crew execution completed",
+                "=== Crew Execution Results ===",
                 extra={
-                    "task_outputs": [
-                        {
-                            "index": idx,
-                            "content": str(output)[:500],  # Log first 500 chars of each output
-                            "length": len(str(output))
-                        } for idx, output in enumerate(task_outputs)
-                    ],
-                    "final_response_length": len(final_response)
+                    "execution_results": {
+                        "original_message": text,
+                        "task_outputs": [
+                            {
+                                "index": idx,
+                                "agent": f"Task {idx + 1}",
+                                "content_preview": str(output)[:500],
+                                "length": len(str(output))
+                            } for idx, output in enumerate(task_outputs)
+                        ],
+                        "final_response_preview": final_response[:500],
+                        "final_response_length": len(final_response)
+                    }
                 }
             )
             
@@ -296,13 +324,16 @@ class TelegramBot:
             
         except Exception as e:
             self.logger.error(
-                "Error processing message",
+                "=== Error Processing Message ===",
                 extra={
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "user_id": user.id,
-                    "chat_id": message.chat_id,
-                    "original_query": text
+                    "error_details": {
+                        "error_message": str(e),
+                        "error_type": type(e).__name__,
+                        "original_message": text,
+                        "user_id": user.id,
+                        "chat_id": message.chat_id,
+                        "stack_trace": True
+                    }
                 },
                 exc_info=True
             )
