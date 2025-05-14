@@ -13,6 +13,7 @@ from config.settings import (
 from pydantic import Field
 
 class Responder(Agent):
+    model_config = {"arbitrary_types_allowed": True}
     short_term_memory: ShortTermMemory = Field(default_factory=ShortTermMemory)
     long_term_memory: LongTermMemory = Field(default_factory=LongTermMemory)
     entity_memory: EntityMemory = Field(default_factory=EntityMemory)
