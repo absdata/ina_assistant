@@ -106,10 +106,14 @@ class TelegramBot:
                     "agent": self.responder,
                     "context": [
                         {
+                            "description": "User's input message",
+                            "expected_output": "Understanding of user's request",
                             "role": "user",
                             "content": text
                         },
                         {
+                            "description": "System context and conversation history",
+                            "expected_output": "Enhanced understanding with context",
                             "role": "system",
                             "content": json.dumps({
                                 "chunks": chunks,
