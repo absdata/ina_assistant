@@ -1,20 +1,16 @@
 from crewai import Agent
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, ClassVar
 from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
 import json
 from config.logging_config import get_logger
 from pydantic import Field, BaseModel
 
 class Critic(Agent):
-    model_config = {"arbitrary_types_allowed": True}
-    
-    # Define model fields
-    model_fields = {
-        "short_term_memory": (ShortTermMemory, Field(default_factory=ShortTermMemory)),
-        "long_term_memory": (LongTermMemory, Field(default_factory=LongTermMemory)),
-        "entity_memory": (EntityMemory, Field(default_factory=EntityMemory)),
-        "logger": (Any, Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization")))
-    }
+    model_config: ClassVar[dict] = {"arbitrary_types_allowed": True}
+    short_term_memory: ShortTermMemory = Field(default_factory=ShortTermMemory)
+    long_term_memory: LongTermMemory = Field(default_factory=LongTermMemory)
+    entity_memory: EntityMemory = Field(default_factory=EntityMemory)
+    logger: Any = Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization"))
 
     def __init__(self, **data):
         # Initialize parent class first

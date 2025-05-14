@@ -1,17 +1,12 @@
 from crewai import Agent
-from typing import List, Dict
+from typing import List, Dict, ClassVar, Any
 from services.file_handler import FileHandler
 import json
 from pydantic import Field, BaseModel
-from typing import Any
 
 class Doer(Agent):
-    model_config = {"arbitrary_types_allowed": True}
-    
-    # Define model fields
-    model_fields = {
-        "file_handler": (FileHandler, Field(default_factory=FileHandler))
-    }
+    model_config: ClassVar[dict] = {"arbitrary_types_allowed": True}
+    file_handler: FileHandler = Field(default_factory=FileHandler)
 
     def __init__(self, **data):
         # Initialize parent class first
