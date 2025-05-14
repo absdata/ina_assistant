@@ -145,7 +145,7 @@ class TelegramBot:
             
             # Get the response from the crew
             response = crew.kickoff()
-            response_text = str(response.raw_output)  # Get raw output from CrewOutput
+            response_text = str(response.tasks_output[0])  # Get first task output from CrewOutput
             
             self.logger.info(
                 "Crew execution completed",
