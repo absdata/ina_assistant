@@ -19,18 +19,23 @@ def create_memory_systems():
         }
     }
 
-    rag_storage = RAGStorage(
-        embedder_config=embedder_config,
-        type="short_term",
-        path="/var/getinn/ina_assistant/memory/"
+    short_term_memory = ShortTermMemory(
+        storage=RAGStorage(
+            embedder_config=embedder_config,
+            type="short_term",
+            path=memory_path
+        )
     )
 
-    short_term = ShortTermMemory(storage=rag_storage)
-    long_term = LongTermMemory(storage=rag_storage)
-    entity = EntityMemory(storage=rag_storage)
+    long_term_memory = LongTermMemory(
+        storage=RAGStorage(
+            embedder_config=embedder_config,
+            type="long_term",  # отличие от short_term
+            path=memory_path
+        )
+    )
 
     return {
-        'short_term': short_term,
-        'long_term': long_term,
-        'entity': entity
+        'short_term_memory': short_term_memory,
+        'long_term_memory': long_term_memory
     }
