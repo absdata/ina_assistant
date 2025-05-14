@@ -1,4 +1,4 @@
-from crewai import Agent
+from crewai import Agent, LLM
 from typing import Dict, List, Any, Optional, ClassVar
 from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
 import json
@@ -21,7 +21,7 @@ class Responder(Agent):
     logger: Any = Field(default_factory=lambda: get_logger("agents.responder", "agent_initialization"))
     default_name: str = Field(default_factory=get_agent_default_name)
 
-    def __init__(self, **data):
+    def __init__(self, llm: LLM = None, **data):
         # Initialize memory systems with Azure embeddings
         memory_systems = create_memory_systems()
         
@@ -36,6 +36,7 @@ class Responder(Agent):
             backstory="""You are an expert responder with deep knowledge in various fields.
             Your role is to provide accurate, complete, and helpful responses to user queries.""",
             allow_delegation=False,
+            llm=llm,
             memory=memory_systems,
             **data
         )

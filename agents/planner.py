@@ -1,16 +1,18 @@
 from crewai import Agent
 from typing import List, Dict
+from crewai import LLM
 import json
 
 class Planner(Agent):
-    def __init__(self):
+    def __init__(self, llm: LLM = None):
         super().__init__(
             role="Strategic Planner",
             goal="Break down user requests into clear, actionable subgoals",
             backstory="""You are a strategic planner who excels at breaking down complex
             requests into smaller, manageable tasks. You analyze user intentions and
             create structured plans.""",
-            allow_delegation=False
+            allow_delegation=False,
+            llm=llm
         )
 
     def analyze_request(self, message: str, chunks: List[str]) -> Dict:

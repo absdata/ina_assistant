@@ -1,4 +1,4 @@
-from crewai import Agent
+from crewai import Agent, LLM
 from typing import List, Dict, ClassVar, Any
 from services.file_handler import FileHandler
 import json
@@ -8,18 +8,18 @@ class Doer(Agent):
     model_config: ClassVar[dict] = {"arbitrary_types_allowed": True}
     file_handler: FileHandler = Field(default_factory=FileHandler)
 
-    def __init__(self, **data):
+    def __init__(self, llm: LLM = None):
         # Initialize file handler first
         file_handler_instance = FileHandler()
         
         # Initialize parent class
         super().__init__(
             role="Task Executor",
-            goal="Execute tasks and perform research efficiently",
-            backstory="""You are a highly efficient executor who gets things done.
-            You excel at research, analysis, and completing tasks with attention to detail.""",
+            goal="Execute planned tasks and generate responses",
+            backstory="""You are a skilled executor who takes plans and turns them into
+            reality. You focus on delivering high-quality results efficiently.""",
             allow_delegation=False,
-            **data
+            llm=llm
         )
         
         # Store initialized instance

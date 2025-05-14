@@ -1,4 +1,4 @@
-from crewai import Agent
+from crewai import Agent, LLM
 from typing import Dict, List, Any, Optional, ClassVar
 from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
 import json
@@ -13,7 +13,7 @@ class Critic(Agent):
     entity_memory: EntityMemory = Field(default_factory=EntityMemory)
     logger: Any = Field(default_factory=lambda: get_logger("agents.critic", "agent_initialization"))
 
-    def __init__(self, **data):
+    def __init__(self, llm: LLM = None, **data):
         # Initialize memory systems with Azure embeddings
         memory_systems = create_memory_systems()
         
@@ -28,6 +28,7 @@ class Critic(Agent):
             Your role is to evaluate responses for accuracy, completeness, and helpfulness,
             while suggesting improvements when necessary.""",
             allow_delegation=False,
+            llm=llm,
             memory=memory_systems,
             **data
         )
