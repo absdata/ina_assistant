@@ -100,20 +100,28 @@ class TelegramBot:
             # Create and run the crew with enhanced context
             crew = Crew(
                 agents=[self.planner, self.doer, self.critic, self.responder],
-                tasks=[
-                    {
-                        "message": text,
-                        "chunks": chunks,
-                        "user_id": user.id,
-                        "chat_id": message.chat_id,
-                        "context": {
-                            "current_chunks": chunks,
-                            "user_context": conversation_context["user_context"],
-                            "chat_context": conversation_context["chat_context"],
-                            "file_context": conversation_context["file_context"]
+                tasks=[{
+                    "description": f"Process and respond to user message: {text}",
+                    "expected_output": "A comprehensive and helpful response to the user's message",
+                    "agent": self.responder,
+                    "context": [
+                        {
+                            "role": "user",
+                            "content": text
+                        },
+                        {
+                            "role": "system",
+                            "content": json.dumps({
+                                "chunks": chunks,
+                                "user_id": user.id,
+                                "chat_id": message.chat_id,
+                                "user_context": conversation_context["user_context"],
+                                "chat_context": conversation_context["chat_context"],
+                                "file_context": conversation_context["file_context"]
+                            })
                         }
-                    }
-                ]
+                    ]
+                }]
             )
             
             self.logger.info(
