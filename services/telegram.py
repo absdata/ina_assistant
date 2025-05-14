@@ -351,6 +351,17 @@ class TelegramBot:
                 }
             )
 
+            embedder_config = {
+                "provider": "azure",
+                "config": {
+                    "deployment_id": os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "text-embedding-3-large"),
+                    "api_key_env_var": os.getenv("AZURE_OPENAI_API_KEY"),
+                    "endpoint_env_var": os.getenv("AZURE_OPENAI_ENDPOINT"),
+                    "api_base": os.getenv("AZURE_OPENAI_ENDPOINT", "https://getinn-openai.openai.azure.com"),
+                    "api_version": os.getenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+                }
+            }
+
             crew = Crew(
                 agents=[self.planner, self.doer, self.critic, self.responder],
                 tasks=tasks,
@@ -361,7 +372,7 @@ class TelegramBot:
                 process=Process.sequential,
                 verbose=True,
                 memory=True,
-                embedder=create_memory_systems()
+                embedder=embedder_config
             )
 
             self.logger.debug(
