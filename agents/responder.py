@@ -44,7 +44,7 @@ class Responder(Agent):
         # Store initialized instances
         self.short_term_memory = memory_systems['short_term']
         self.long_term_memory = memory_systems['long_term']
-        self.entity_memory = memory_systems['entity']
+        #self.entity_memory = memory_systems['entity']
         self.logger = logger
         self.default_name = default_name
         
