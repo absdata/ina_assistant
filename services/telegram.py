@@ -64,28 +64,50 @@ class TelegramBot:
     def _log_agent_start(self, agent_name: str, task: Dict[str, Any]) -> None:
         """Log when an agent starts working on a task."""
         self.logger.debug(
-            f"Agent {agent_name} starting work",
+            f"=== Agent {agent_name} Starting Work ===",
             extra={
-                "context": "agent_execution",
-                "agent": agent_name,
-                "task_description": task.get("description", ""),
-                "task_context": task.get("context", []),
-                "stage": "start"
+                "agent_start": {
+                    "agent": agent_name,
+                    "task_description": task.get("description", ""),
+                    "dependencies": task.get("dependencies", []),
+                    "context": [
+                        {
+                            "role": ctx.get("role", "unknown"),
+                            "content_preview": ctx.get("content", "")[:200]
+                        } for ctx in task.get("context", [])
+                    ]
+                }
             }
         )
 
     def _log_agent_end(self, agent_name: str, output: str, task: Dict[str, Any]) -> None:
         """Log when an agent completes a task."""
         self.logger.debug(
-            f"Agent {agent_name} completed task",
+            f"=== Agent {agent_name} Completed Task ===",
             extra={
-                "context": "agent_execution",
-                "agent": agent_name,
-                "output": str(output),
-                "task_description": task.get("description", ""),
-                "stage": "complete"
+                "agent_completion": {
+                    "agent": agent_name,
+                    "task_description": task.get("description", ""),
+                    "output_preview": str(output)[:500] if output else "",
+                    "dependencies": task.get("dependencies", []),
+                    "output_length": len(str(output)) if output else 0
+                }
             }
         )
+
+    async def _process_task_output(self, task_outputs: list) -> None:
+        """Process and log task outputs."""
+        for idx, output in enumerate(task_outputs):
+            self.logger.debug(
+                f"=== Task {idx + 1} Output ===",
+                extra={
+                    "task_output": {
+                        "task_index": idx,
+                        "output_preview": str(output)[:500],
+                        "output_length": len(str(output))
+                    }
+                }
+            )
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle incoming messages with enhanced context awareness."""
@@ -212,7 +234,8 @@ class TelegramBot:
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
-                    ]
+                    ],
+                    "dependencies": []  # First task has no dependencies
                 },
                 {
                     "description": "Execute the plan and process the request",
@@ -220,10 +243,10 @@ class TelegramBot:
                     "agent": self.doer,
                     "context": [
                         {
-                            "description": "User's request to process",
+                            "description": "User's request and plan to execute",
                             "expected_output": "Understanding of the task",
                             "role": "user",
-                            "content": f"Original query: {text}\n\nAnalyze and use the provided {len(chunks)} file chunks and context to answer the query. Each chunk contains relevant information that should be incorporated into the response."
+                            "content": f"Original query: '{text}'\n\nAnalyze and use the provided {len(chunks)} file chunks and context to answer the query. Each chunk contains relevant information that should be incorporated into the response."
                         },
                         {
                             "description": "Available context and information",
@@ -231,7 +254,8 @@ class TelegramBot:
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
-                    ]
+                    ],
+                    "dependencies": [0]  # Depends on planner's output
                 },
                 {
                     "description": "Review and critique the execution results",
@@ -239,10 +263,10 @@ class TelegramBot:
                     "agent": self.critic,
                     "context": [
                         {
-                            "description": "User's original request",
+                            "description": "User's original request and execution results",
                             "expected_output": "Understanding of requirements",
                             "role": "user",
-                            "content": f"Original query: {text}\n\nVerify that the response incorporates information from all {len(chunks)} available file chunks and context appropriately."
+                            "content": f"Original query: '{text}'\n\nVerify that the response incorporates information from all {len(chunks)} available file chunks and context appropriately."
                         },
                         {
                             "description": "Available context and information",
@@ -250,7 +274,8 @@ class TelegramBot:
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
-                    ]
+                    ],
+                    "dependencies": [0, 1]  # Depends on planner and doer
                 },
                 {
                     "description": "Generate final response based on all previous work",
@@ -258,10 +283,10 @@ class TelegramBot:
                     "agent": self.responder,
                     "context": [
                         {
-                            "description": "User's request to respond to",
+                            "description": "User's request and all previous work",
                             "expected_output": "Understanding of user needs",
                             "role": "user",
-                            "content": f"Original query: {text}\n\nGenerate a comprehensive response using information from the {len(chunks)} available file chunks and previous agent outputs. Ensure all relevant information is included."
+                            "content": f"Original query: '{text}'\n\nGenerate a comprehensive response using information from the {len(chunks)} available file chunks and previous agent outputs. Ensure all relevant information is included."
                         },
                         {
                             "description": "Available context and information",
@@ -269,9 +294,29 @@ class TelegramBot:
                             "role": "system",
                             "content": json.dumps(shared_context)
                         }
-                    ]
+                    ],
+                    "dependencies": [0, 1, 2]  # Depends on all previous tasks
                 }
             ]
+
+            # Log task setup
+            self.logger.debug(
+                "=== Task Configuration ===",
+                extra={
+                    "task_setup": {
+                        "original_query": text,
+                        "tasks": [
+                            {
+                                "index": idx,
+                                "agent": task["agent"].__class__.__name__,
+                                "description": task["description"],
+                                "dependencies": task["dependencies"],
+                                "context_preview": task["context"][0]["content"][:200]
+                            } for idx, task in enumerate(tasks)
+                        ]
+                    }
+                }
+            )
 
             crew = Crew(
                 agents=[self.planner, self.doer, self.critic, self.responder],
@@ -291,7 +336,7 @@ class TelegramBot:
                         "first_task": {
                             "description": tasks[0]["description"],
                             "agent": tasks[0]["agent"].__class__.__name__,
-                            "context_preview": tasks[0]["context"][0]["content"][:200]
+                            "context_preview": tasks[0]["context"][0]["content"]
                         },
                         "available_resources": {
                             "chunks": len(chunks),
@@ -304,23 +349,18 @@ class TelegramBot:
             # Get the response from the crew
             response = crew.kickoff()
             
-            # Get all task outputs
+            # Get all task outputs and process them
             task_outputs = response.tasks_output
+            await self._process_task_output(task_outputs)
+            
             final_response = str(task_outputs[-1])
             
             self.logger.debug(
                 "=== Crew Execution Results ===",
                 extra={
                     "execution_results": {
-                        "original_message": text,
-                        "task_outputs": [
-                            {
-                                "index": idx,
-                                "agent": f"Task {idx + 1}",
-                                "content_preview": str(output)[:500],
-                                "length": len(str(output))
-                            } for idx, output in enumerate(task_outputs)
-                        ],
+                        "original_query": text,
+                        "total_tasks": len(task_outputs),
                         "final_response_preview": final_response[:500],
                         "final_response_length": len(final_response)
                     }
