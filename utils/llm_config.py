@@ -1,4 +1,5 @@
 from crewai import LLM
+from langchain_openai import AzureChatOpenAI
 import os
 from config.settings import (
     AZURE_OPENAI_API_KEY,
