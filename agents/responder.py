@@ -19,7 +19,11 @@ class Responder(Agent):
         self.entity_memory = EntityMemory()
         self.contextual_memory = ContextualMemory()
         
-        self.logger = get_logger("agents.responder")
+        # Initialize logger with more specific context
+        self.logger = get_logger("agents.responder", "agent_initialization")
+        self.logger.info("Initializing Responder agent", extra={
+            "memory_systems": ["short_term", "long_term", "entity", "contextual"]
+        })
         
         # Get agent name from settings
         self.default_name = get_agent_default_name()
@@ -83,8 +87,13 @@ class Responder(Agent):
         """
         try:
             self.logger.info(
-                "Preparing document response",
-                extra={"context": "document_response"}
+                "Starting document response preparation",
+                extra={
+                    "context": "document_response",
+                    "document_type": document.get("type"),
+                    "document_name": document.get("name"),
+                    "user_id": user_id
+                }
             )
             
             # Store document in memory
@@ -95,10 +104,26 @@ class Responder(Agent):
             doc_name = document.get("name", "document")
             
             # Create document summary
+            self.logger.debug(
+                "Creating document summary",
+                extra={
+                    "context": "document_summary",
+                    "document_type": doc_type
+                }
+            )
             summary = self._create_document_summary(document)
             
             # Get historical context if available
-            historical_context = self._get_historical_context(user_id) if user_id else {}
+            historical_context = {}
+            if user_id:
+                self.logger.debug(
+                    "Retrieving historical context",
+                    extra={
+                        "context": "historical_context",
+                        "user_id": user_id
+                    }
+                )
+                historical_context = self._get_historical_context(user_id)
             
             # Build response components
             greeting = self._create_document_greeting(doc_type, doc_name)
@@ -113,12 +138,27 @@ class Responder(Agent):
             
             response += f"\n\n{self._create_document_closing()}"
             
+            self.logger.info(
+                "Document response prepared successfully",
+                extra={
+                    "context": "document_response",
+                    "response_length": len(response),
+                    "has_suggestions": bool(suggestions)
+                }
+            )
+            
             return response
             
         except Exception as e:
             self.logger.error(
-                f"Error preparing document response: {str(e)}",
-                extra={"context": "document_response"}
+                "Error preparing document response",
+                extra={
+                    "context": "document_response",
+                    "error": str(e),
+                    "document_type": document.get("type"),
+                    "document_name": document.get("name")
+                },
+                exc_info=True
             )
             raise
 

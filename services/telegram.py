@@ -13,15 +13,9 @@ from agents.critic import Critic
 from agents.responder import Responder
 from crewai import Crew
 from config.settings import TELEGRAM_BOT_TOKEN
+from config.logging_config import get_logger
 import asyncio
-import logging
-
-# Set up logging
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+import json
 
 class TelegramBot:
     def __init__(self):
@@ -30,9 +24,25 @@ class TelegramBot:
         self.doer = Doer()
         self.critic = Critic()
         self.responder = Responder()
+        self.logger = get_logger("services.telegram", "bot_service")
+        self.logger.info("Initializing Telegram bot service", extra={
+            "agents": ["planner", "doer", "critic", "responder"],
+            "services": ["file_handler"]
+        })
         
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Handle /start command."""
+        user = update.message.from_user
+        self.logger.info(
+            "New user started the bot",
+            extra={
+                "context": "start_command",
+                "user_id": user.id,
+                "username": user.username,
+                "chat_id": update.message.chat_id
+            }
+        )
+        
         welcome_message = (
             "👋 Hi! I'm Inna, your startup co-founder and AI assistant. "
             "I'm here to help you with anything you need!\n\n"
@@ -44,17 +54,48 @@ class TelegramBot:
         """Handle incoming messages with enhanced context awareness."""
         message = update.message
         text = message.text or ""
+        user = message.from_user
         
         # Check if message starts with "Inna" or "Ina"
         if not text.lower().startswith(("inna", "ina")):
             return
             
         try:
+            self.logger.info(
+                "Processing new message",
+                extra={
+                    "context": "message_handling",
+                    "user_id": user.id,
+                    "chat_id": message.chat_id,
+                    "message_length": len(text),
+                    "message_type": "text"
+                }
+            )
+            
             # Process the message
             message_id, chunks = await self._process_message(message)
             
+            self.logger.debug(
+                "Message processed",
+                extra={
+                    "context": "message_processing",
+                    "message_id": message_id,
+                    "chunks_count": len(chunks)
+                }
+            )
+            
             # Get comprehensive context
             conversation_context = await self._get_conversation_context(message)
+            
+            self.logger.debug(
+                "Retrieved conversation context",
+                extra={
+                    "context": "context_retrieval",
+                    "user_context_size": len(conversation_context["user_context"]),
+                    "chat_context_size": len(conversation_context["chat_context"]),
+                    "file_context_size": len(conversation_context["file_context"])
+                }
+            )
             
             # Create and run the crew with enhanced context
             crew = Crew(
@@ -63,7 +104,7 @@ class TelegramBot:
                     {
                         "message": text,
                         "chunks": chunks,
-                        "user_id": message.from_user.id,
+                        "user_id": user.id,
                         "chat_id": message.chat_id,
                         "context": {
                             "current_chunks": chunks,
@@ -75,14 +116,41 @@ class TelegramBot:
                 ]
             )
             
+            self.logger.info(
+                "Starting crew execution",
+                extra={
+                    "context": "crew_execution",
+                    "agents": ["planner", "doer", "critic", "responder"],
+                    "user_id": user.id
+                }
+            )
+            
             # Get the response from the crew
             response = await crew.run()
+            
+            self.logger.info(
+                "Crew execution completed",
+                extra={
+                    "context": "crew_execution",
+                    "response_length": len(response),
+                    "user_id": user.id
+                }
+            )
             
             # Send the response
             await message.reply_text(response, parse_mode='HTML')
             
         except Exception as e:
-            logger.error(f"Error processing message: {e}")
+            self.logger.error(
+                "Error processing message",
+                extra={
+                    "context": "message_handling",
+                    "error": str(e),
+                    "user_id": user.id,
+                    "chat_id": message.chat_id
+                },
+                exc_info=True
+            )
             await message.reply_text(
                 "I apologize, but I encountered an error while processing your request. "
                 "Please try again later."
@@ -92,10 +160,31 @@ class TelegramBot:
         """Handle document uploads with enhanced context awareness."""
         message = update.message
         document = message.document
+        user = message.from_user
+        
+        self.logger.info(
+            "Received document upload",
+            extra={
+                "context": "document_handling",
+                "user_id": user.id,
+                "chat_id": message.chat_id,
+                "file_name": document.file_name,
+                "file_size": document.file_size,
+                "mime_type": document.mime_type
+            }
+        )
         
         # Check if file type is supported
         file_type = self._get_file_type(document.file_name)
         if not file_type:
+            self.logger.warning(
+                "Unsupported file type",
+                extra={
+                    "context": "document_handling",
+                    "file_name": document.file_name,
+                    "user_id": user.id
+                }
+            )
             await message.reply_text(
                 "Sorry, I can only process PDF, DOCX, and TXT files at the moment."
             )
@@ -103,8 +192,25 @@ class TelegramBot:
             
         try:
             # Download the file
+            self.logger.debug(
+                "Downloading document",
+                extra={
+                    "context": "document_processing",
+                    "file_type": file_type,
+                    "file_id": document.file_id
+                }
+            )
+            
             file = await context.bot.get_file(document.file_id)
             file_content = await file.download_as_bytearray()
+            
+            self.logger.debug(
+                "Document downloaded successfully",
+                extra={
+                    "context": "document_processing",
+                    "content_size": len(file_content)
+                }
+            )
             
             # Process the file with context
             message_id, chunks = await self._process_file(
@@ -112,6 +218,16 @@ class TelegramBot:
                 file_name=document.file_name,
                 file_type=file_type,
                 message=message
+            )
+            
+            self.logger.info(
+                "Document processed successfully",
+                extra={
+                    "context": "document_processing",
+                    "message_id": message_id,
+                    "chunks_count": len(chunks),
+                    "file_type": file_type
+                }
             )
             
             # Get file-specific context
@@ -128,7 +244,17 @@ class TelegramBot:
             await message.reply_text(response)
             
         except Exception as e:
-            logger.error(f"Error processing document: {e}")
+            self.logger.error(
+                "Error processing document",
+                extra={
+                    "context": "document_handling",
+                    "error": str(e),
+                    "file_name": document.file_name,
+                    "file_type": file_type,
+                    "user_id": user.id
+                },
+                exc_info=True
+            )
             await message.reply_text(
                 "I apologize, but I encountered an error while processing your file. "
                 "Please try again later."
