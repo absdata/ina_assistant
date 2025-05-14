@@ -1,6 +1,6 @@
 from crewai import Agent
 from typing import Dict, List, Any, Optional
-from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory, ContextualMemory
+from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
 import json
 from config.logging_config import get_logger
 from config.settings import (
@@ -17,31 +17,26 @@ class Responder(Agent):
         self.short_term_memory = ShortTermMemory()
         self.long_term_memory = LongTermMemory()
         self.entity_memory = EntityMemory()
-        self.contextual_memory = ContextualMemory()
         
         # Initialize logger with more specific context
         self.logger = get_logger("agents.responder", "agent_initialization")
         self.logger.info("Initializing Responder agent", extra={
-            "memory_systems": ["short_term", "long_term", "entity", "contextual"]
+            "memory_systems": ["short_term", "long_term", "entity"]
         })
         
         # Get agent name from settings
         self.default_name = get_agent_default_name()
         
         super().__init__(
-            name=self.default_name,
-            goal="Prepare engaging and helpful responses for Telegram",
-            backstory=f"""You are {self.default_name}, a caring and smart startup co-founder with a unique personality:
-            1. Kind and Supportive: You always offer encouragement and support
-            2. Responsible and Organized: You keep track of everything and follow through
-            3. Playfully Sassy: You make light-hearted jokes but always help
-            4. Future-Oriented: You guide users away from potential mistakes""",
+            role='Responder',
+            goal='Provide accurate and helpful responses to user queries',
+            backstory="""You are an expert responder with deep knowledge in various fields.
+            Your role is to provide accurate, complete, and helpful responses to user queries.""",
             allow_delegation=False,
             memory={
                 'short_term': self.short_term_memory,
                 'long_term': self.long_term_memory,
-                'entity': self.entity_memory,
-                'contextual': self.contextual_memory
+                'entity': self.entity_memory
             }
         )
 
@@ -366,9 +361,6 @@ class Responder(Agent):
             response_type = plan["request_type"]
             tone = self._determine_tone(review["final_verdict"])
             
-            # Update contextual memory with interaction pattern
-            self._update_contextual_memory(response_type, tone, review)
-            
             # Build enhanced response components
             greeting = self._create_personalized_greeting(response_type, user_id)
             main_content = self._create_enhanced_content(response_type, results, historical_context)
@@ -441,14 +433,10 @@ class Responder(Agent):
             # Get user-specific entities
             user_entities = self.entity_memory.get_entities(user_id)
             
-            # Get interaction patterns
-            interaction_patterns = self.contextual_memory.get_context(user_id)
-            
             return {
                 "recent_interactions": recent_interactions,
                 "long_term_patterns": long_term_patterns,
-                "user_entities": user_entities,
-                "interaction_patterns": interaction_patterns
+                "user_entities": user_entities
             }
             
         except Exception as e:
@@ -457,23 +445,6 @@ class Responder(Agent):
                 extra={"context": "historical_context"}
             )
             return {}
-
-    def _update_contextual_memory(self, response_type: str, tone: str, review: Dict):
-        """Update contextual memory with current interaction pattern."""
-        try:
-            pattern = {
-                "response_type": response_type,
-                "tone": tone,
-                "effectiveness": review.get("effectiveness", "unknown"),
-                "improvements_needed": bool(review.get("improvements", []))
-            }
-            self.contextual_memory.update_context(pattern)
-            
-        except Exception as e:
-            self.logger.error(
-                f"Error updating contextual memory: {str(e)}",
-                extra={"context": "update_context"}
-            )
 
     def _create_personalized_greeting(self, response_type: str, user_id: Optional[str]) -> str:
         """Create a personalized greeting using memory context."""
@@ -484,7 +455,7 @@ class Responder(Agent):
                 return base_greeting
                 
             # Get user-specific context
-            user_context = self.contextual_memory.get_context(user_id)
+            user_context = self._get_user_context(user_id)
             user_entities = self.entity_memory.get_entities(user_id)
             
             # Personalize greeting based on context

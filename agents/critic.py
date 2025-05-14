@@ -1,6 +1,6 @@
 from crewai import Agent
 from typing import Dict, List, Any, Optional
-from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory, ContextualMemory
+from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
 import json
 from config.logging_config import get_logger
 
@@ -10,9 +10,11 @@ class Critic(Agent):
         self.short_term_memory = ShortTermMemory()
         self.long_term_memory = LongTermMemory()
         self.entity_memory = EntityMemory()
-        self.contextual_memory = ContextualMemory()
         
-        self.logger = get_logger("agents.critic")
+        self.logger = get_logger("agents.critic", "agent_initialization")
+        self.logger.info("Initializing Critic agent", extra={
+            "memory_systems": ["short_term", "long_term", "entity"]
+        })
         
         super().__init__(
             role='Critic',
@@ -24,8 +26,7 @@ class Critic(Agent):
             memory={
                 'short_term': self.short_term_memory,
                 'long_term': self.long_term_memory,
-                'entity': self.entity_memory,
-                'contextual': self.contextual_memory
+                'entity': self.entity_memory
             }
         )
 
@@ -82,12 +83,6 @@ class Critic(Agent):
                 evaluation
             )
 
-            # Update contextual memory with evaluation patterns
-            self.contextual_memory.update_context({
-                "evaluation_pattern": self._extract_evaluation_pattern(evaluation),
-                "response_type": self._classify_response_type(response)
-            })
-
             self.logger.debug(
                 f"Memory-enhanced evaluation completed: {evaluation}",
                 extra={"context": "evaluate_response"}
@@ -128,53 +123,6 @@ class Critic(Agent):
                 extra={"context": "historical_insights"}
             )
             return []
-
-    def _extract_evaluation_pattern(self, evaluation: Dict[str, Any]) -> Dict[str, Any]:
-        """Extract patterns from evaluation for contextual memory."""
-        try:
-            pattern = {
-                "quality_range": self._get_score_range(evaluation["quality_score"]),
-                "accuracy_range": self._get_score_range(evaluation["accuracy_score"]),
-                "completeness_range": self._get_score_range(evaluation["completeness_score"]),
-                "suggestion_types": self._categorize_suggestions(evaluation["suggestions"])
-            }
-            return pattern
-        except Exception as e:
-            self.logger.error(
-                f"Error extracting evaluation pattern: {str(e)}",
-                extra={"context": "pattern_extraction"}
-            )
-            return {}
-
-    def _classify_response_type(self, response: str) -> str:
-        """Classify the type of response for contextual memory."""
-        try:
-            # Implement response classification logic
-            # Example: technical, conceptual, procedural, etc.
-            return "general"  # Placeholder
-        except Exception as e:
-            self.logger.error(
-                f"Error classifying response: {str(e)}",
-                extra={"context": "response_classification"}
-            )
-            return "unknown"
-
-    def _get_score_range(self, score: float) -> str:
-        """Convert numerical score to range category."""
-        if score >= 0.8:
-            return "high"
-        elif score >= 0.6:
-            return "medium"
-        else:
-            return "low"
-
-    def _categorize_suggestions(self, suggestions: List[str]) -> List[str]:
-        """Categorize types of suggestions made."""
-        categories = set()
-        for suggestion in suggestions:
-            # Add suggestion categorization logic
-            categories.add("general")  # Placeholder
-        return list(categories)
 
     def _process_historical_insights(self, insights: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Process and filter historical insights for relevance."""
