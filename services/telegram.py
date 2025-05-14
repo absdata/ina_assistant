@@ -237,6 +237,7 @@ class TelegramBot:
                 {
                     "description": "Original user request and conversation history",
                     "role": "system",
+                    "expected_output": "Understanding of the complete conversation context",
                     "content": (
                         f"Original request: '{text}'\n\n"
                         f"Recent conversation history:\n{readable_history}"
@@ -245,6 +246,7 @@ class TelegramBot:
                 {
                     "description": "Available context and resources",
                     "role": "system",
+                    "expected_output": "Access to all available contextual information",
                     "content": json.dumps(shared_context)
                 }
             ]
@@ -258,6 +260,7 @@ class TelegramBot:
                         {
                             "description": "Planning instructions",
                             "role": "user",
+                            "expected_output": "A clear plan with specific steps for execution",
                             "content": (
                                 "Create a detailed plan that:\n"
                                 "1. Addresses the user's request directly\n"
@@ -276,6 +279,7 @@ class TelegramBot:
                         {
                             "description": "Execution instructions",
                             "role": "user",
+                            "expected_output": "Concrete results from following the plan",
                             "content": (
                                 "Execute the plan from the Strategic Planner while:\n"
                                 "1. Following the specified steps\n"
@@ -295,6 +299,7 @@ class TelegramBot:
                         {
                             "description": "Review instructions",
                             "role": "user",
+                            "expected_output": "Detailed analysis and improvement suggestions",
                             "content": (
                                 "Review the execution results while considering:\n"
                                 "1. Accuracy and completeness of the response\n"
@@ -314,6 +319,7 @@ class TelegramBot:
                         {
                             "description": "Response generation instructions",
                             "role": "user",
+                            "expected_output": "A clear, coherent, and contextually appropriate response",
                             "content": (
                                 "Generate a final response that:\n"
                                 "1. Directly addresses the user's request\n"
