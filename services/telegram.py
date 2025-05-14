@@ -263,7 +263,7 @@ class TelegramBot:
             response = crew.kickoff()
             
             # Get all task outputs
-            task_outputs = response.tasks_outputs
+            task_outputs = response.tasks_output
             final_response = task_outputs[-1]  # Last output is from the Responder
             
             # Log execution summary
