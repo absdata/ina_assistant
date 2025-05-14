@@ -6,7 +6,7 @@ import json
 class Doer(Agent):
     def __init__(self):
         super().__init__(
-            name="Doer",
+            role="Task Executor",
             goal="Execute tasks and perform research efficiently",
             backstory="""You are a highly efficient executor who gets things done.
             You excel at research, analysis, and completing tasks with attention to detail.""",
