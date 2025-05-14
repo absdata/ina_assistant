@@ -19,7 +19,7 @@ def create_memory_systems():
     )
     
     # Create RAG storage with custom embedding function
-    rag_storage = RAGStorage(embedding_function=embedding_function)
+    rag_storage = RAGStorage(embedder=embedding_function)
     
     # Create memory systems with RAG storage
     short_term = ShortTermMemory(storage=rag_storage)
