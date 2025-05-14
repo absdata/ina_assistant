@@ -151,10 +151,14 @@ class TelegramBot:
                         "agent": self.planner,
                         "context": [
                             {
+                                "description": "User's request to analyze",
+                                "expected_output": "Understanding of the request",
                                 "role": "user",
                                 "content": text
                             },
                             {
+                                "description": "System context and available information",
+                                "expected_output": "Context for planning",
                                 "role": "system",
                                 "content": json.dumps({
                                     "chunks": chunks,
@@ -171,10 +175,14 @@ class TelegramBot:
                         "agent": self.doer,
                         "context": [
                             {
+                                "description": "User's request to process",
+                                "expected_output": "Understanding of the task",
                                 "role": "user",
                                 "content": text
                             },
                             {
+                                "description": "System context and available information",
+                                "expected_output": "Context for execution",
                                 "role": "system",
                                 "content": json.dumps({
                                     "chunks": chunks,
@@ -191,10 +199,14 @@ class TelegramBot:
                         "agent": self.critic,
                         "context": [
                             {
+                                "description": "User's original request",
+                                "expected_output": "Understanding of requirements",
                                 "role": "user",
                                 "content": text
                             },
                             {
+                                "description": "System context and execution results",
+                                "expected_output": "Context for critique",
                                 "role": "system",
                                 "content": json.dumps({
                                     "chunks": chunks,
@@ -211,10 +223,14 @@ class TelegramBot:
                         "agent": self.responder,
                         "context": [
                             {
+                                "description": "User's request to respond to",
+                                "expected_output": "Understanding of user needs",
                                 "role": "user",
                                 "content": text
                             },
                             {
+                                "description": "System context and previous agent outputs",
+                                "expected_output": "Context for response generation",
                                 "role": "system",
                                 "content": json.dumps({
                                     "chunks": chunks,
@@ -230,7 +246,7 @@ class TelegramBot:
                     "on_task_start": lambda agent, task: self._log_agent_start(agent.name, task),
                     "on_task_end": lambda agent, output, task: self._log_agent_end(agent.name, output, task)
                 },
-                verbose=True  # Enable verbose mode
+                verbose=True
             )
             
             self.logger.info(
