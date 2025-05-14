@@ -1,4 +1,5 @@
-from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory, RAGStorage
+from crewai.memory import ShortTermMemory, LongTermMemory, EntityMemory
+from crewai.memory.storage.rag_storage import RAGStorage
 from utils.azure_embeddings import AzureOpenAIEmbeddingFunction
 from config.settings import (
     AZURE_OPENAI_API_KEY,
