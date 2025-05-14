@@ -2,14 +2,16 @@ from crewai import Agent
 from typing import List, Dict
 from services.file_handler import FileHandler
 import json
-from pydantic import Field
+from pydantic import Field, BaseModel
 from typing import Any
 
 class Doer(Agent):
     model_config = {"arbitrary_types_allowed": True}
-    file_handler: FileHandler = Field(default_factory=FileHandler)
 
     def __init__(self):
+        # Initialize file handler first
+        self.file_handler = FileHandler()
+
         super().__init__(
             role="Task Executor",
             goal="Execute tasks and perform research efficiently",

@@ -10,17 +10,19 @@ from config.settings import (
     get_document_type_name,
     SUPPORTED_DOCUMENT_TYPES
 )
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 class Responder(Agent):
     model_config = {"arbitrary_types_allowed": True}
-    short_term_memory: ShortTermMemory = Field(default_factory=ShortTermMemory)
-    long_term_memory: LongTermMemory = Field(default_factory=LongTermMemory)
-    entity_memory: EntityMemory = Field(default_factory=EntityMemory)
-    logger: Any = Field(default_factory=lambda: get_logger("agents.responder", "agent_initialization"))
-    default_name: str = Field(default_factory=get_agent_default_name)
 
     def __init__(self):
+        # Initialize memory systems and other attributes first
+        self.short_term_memory = ShortTermMemory()
+        self.long_term_memory = LongTermMemory()
+        self.entity_memory = EntityMemory()
+        self.logger = get_logger("agents.responder", "agent_initialization")
+        self.default_name = get_agent_default_name()
+
         super().__init__(
             role='Responder',
             goal='Provide accurate and helpful responses to user queries',
