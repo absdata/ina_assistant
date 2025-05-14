@@ -10,7 +10,6 @@ from config.settings import (
 def create_llm_config() -> LLM:
     """Create LLM configuration for agents using Azure OpenAI."""
     return LLM(
-        provider="azure",
         model=f"azure/{AZURE_OPENAI_DEPLOYMENT_NAME}",  # Prefix with 'azure/' to indicate Azure provider
         api_key=AZURE_OPENAI_API_KEY,
         base_url=AZURE_OPENAI_ENDPOINT,
