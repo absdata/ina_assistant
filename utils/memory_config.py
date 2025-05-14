@@ -19,6 +19,8 @@ def create_memory_systems():
         }
     }
 
+    memory_path = "./memory/"
+
     short_term_memory = ShortTermMemory(
         storage=RAGStorage(
             embedder_config=embedder_config,
