@@ -2,8 +2,11 @@ from crewai import Agent
 from typing import List, Dict
 from services.file_handler import FileHandler
 import json
+from pydantic import Field
 
 class Doer(Agent):
+    file_handler: FileHandler = Field(default_factory=FileHandler)
+
     def __init__(self):
         super().__init__(
             role="Task Executor",
@@ -12,7 +15,6 @@ class Doer(Agent):
             You excel at research, analysis, and completing tasks with attention to detail.""",
             allow_delegation=False
         )
-        self.file_handler = FileHandler()
 
     def execute_plan(self, plan: Dict) -> Dict:
         """

@@ -10,22 +10,19 @@ from config.settings import (
     get_document_type_name,
     SUPPORTED_DOCUMENT_TYPES
 )
+from pydantic import Field
 
 class Responder(Agent):
+    short_term_memory: ShortTermMemory = Field(default_factory=ShortTermMemory)
+    long_term_memory: LongTermMemory = Field(default_factory=LongTermMemory)
+    entity_memory: EntityMemory = Field(default_factory=EntityMemory)
+    logger: Any = Field(default_factory=lambda: get_logger("agents.responder", "agent_initialization"))
+    default_name: str = Field(default_factory=get_agent_default_name)
+
     def __init__(self):
-        # Initialize memory systems
-        self.short_term_memory = ShortTermMemory()
-        self.long_term_memory = LongTermMemory()
-        self.entity_memory = EntityMemory()
-        
-        # Initialize logger with more specific context
-        self.logger = get_logger("agents.responder", "agent_initialization")
         self.logger.info("Initializing Responder agent", extra={
             "memory_systems": ["short_term", "long_term", "entity"]
         })
-        
-        # Get agent name from settings
-        self.default_name = get_agent_default_name()
         
         super().__init__(
             role='Responder',
