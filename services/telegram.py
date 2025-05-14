@@ -357,6 +357,7 @@ class TelegramBot:
                     "on_task_start": lambda agent, task: self._log_agent_start(agent.name, task),
                     "on_task_end": lambda agent, output, task: self._log_agent_end(agent.name, output, task)
                 },
+                process=Process.sequential,
                 verbose=True,
                 memory=True
             )
